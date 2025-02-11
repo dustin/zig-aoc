@@ -1,5 +1,5 @@
 {
-  description = "GPMF for Zig";
+  description = "AOC junk for Zig";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
@@ -9,7 +9,7 @@
     in {
       packages = eachSystem (system: let pkgs = import nixpkgs { inherit system; }; in {
         default = pkgs.stdenv.mkDerivation {
-          name = "zig-gpmf";
+          name = "aoc";
           src = ./.;
           buildInputs = [ pkgs.zig ];
         };
