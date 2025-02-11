@@ -14,7 +14,7 @@ pub fn flood(
     var queue = std.ArrayList(T).init(alloc);
     defer queue.deinit();
     try queue.append(start);
-    while (queue.popOrNull()) |current| {
+    while (queue.pop()) |current| {
         if (res.get(current)) |_| continue;
         try res.put(current, {});
 
@@ -50,4 +50,54 @@ test flood {
     defer res.deinit();
     try flood([2]i32, allocator, @as(i32, 5), [2]i32{ 0, 0 }, Points.neighbs, &res);
     try std.testing.expectEqual(11, res.count());
+}
+
+/// Do a BFS, calling into a function with each found neighbor.
+pub fn bfs(
+    comptime T: type,
+    alloc: std.mem.Allocator,
+    context: anytype,
+    start: T,
+    comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(T)) OutOfMemory!void,
+    comptime found: fn (@TypeOf(context), @TypeOf(start)) bool, // if true, stop searching
+) OutOfMemory!void {
+    var queue = std.ArrayList(T).init(alloc);
+    defer queue.deinit();
+    try queue.append(start);
+    while (queue.pop()) |current| {
+        if (found(context, current)) return;
+
+        var stalloc = std.heap.stackFallback(1024, alloc);
+        var neighbor_list = std.ArrayList(T).init(stalloc.get());
+        defer neighbor_list.deinit();
+        try nf(context, current, &neighbor_list);
+
+        for (neighbor_list.items) |neighbor| {
+            if (found(context, neighbor)) return;
+            try queue.append(neighbor);
+        }
+    }
+}
+
+test bfs {
+    const T = struct {
+        latest: ?[2]i32 = null,
+        target: i32 = 0,
+
+        pub fn neighbs(_: *@This(), point: [2]i32, neighbors: *std.ArrayList([2]i32)) OutOfMemory!void {
+            if (point[0] < 10 and point[0] >= 0) {
+                try neighbors.append(.{ point[0] + 1, point[1] + 1 });
+            }
+        }
+
+        pub fn found(ctx: *@This(), point: [2]i32) bool {
+            ctx.latest = point;
+            return point[0] == ctx.target;
+        }
+    };
+
+    const allocator = std.testing.allocator;
+    var tee = T{ .target = 5 };
+    try bfs([2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.neighbs, T.found);
+    try std.testing.expectEqual([2]i32{ 5, 5 }, tee.latest.?);
 }
