@@ -59,21 +59,20 @@ pub fn bfs(
     context: anytype,
     start: T,
     comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(T)) OutOfMemory!void,
-    comptime found: fn (@TypeOf(context), @TypeOf(start)) bool, // if true, stop searching
+    comptime found: fn (@TypeOf(context), @TypeOf(start)) OutOfMemory!bool, // if true, stop searching
 ) OutOfMemory!void {
     var queue = std.ArrayList(T).init(alloc);
     defer queue.deinit();
     try queue.append(start);
+    if (try found(context, start)) return;
     while (queue.pop()) |current| {
-        if (found(context, current)) return;
-
         var stalloc = std.heap.stackFallback(1024, alloc);
         var neighbor_list = std.ArrayList(T).init(stalloc.get());
         defer neighbor_list.deinit();
         try nf(context, current, &neighbor_list);
 
         for (neighbor_list.items) |neighbor| {
-            if (found(context, neighbor)) return;
+            if (try found(context, neighbor)) return;
             try queue.append(neighbor);
         }
     }
@@ -90,7 +89,7 @@ test bfs {
             }
         }
 
-        pub fn found(ctx: *@This(), point: [2]i32) bool {
+        pub fn found(ctx: *@This(), point: [2]i32) OutOfMemory!bool {
             ctx.latest = point;
             return point[0] == ctx.target;
         }
