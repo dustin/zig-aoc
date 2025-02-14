@@ -100,3 +100,69 @@ test bfs {
     try bfs([2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.neighbs, T.found);
     try std.testing.expectEqual([2]i32{ 5, 5 }, tee.latest.?);
 }
+
+pub fn Node(comptime T: type) type {
+    return struct {
+        cost: i32,
+        heuristic: i32,
+        val: T,
+
+        fn comp(_: void, a: @This(), b: @This()) std.math.Order {
+            if (a.cost == b.cost) {
+                return std.math.order(a.heuristic, b.heuristic);
+            }
+            return std.math.order(a.cost, b.cost);
+        }
+    };
+}
+
+/// Do a A* search, calling into a function with each found neighbor.
+pub fn astar(
+    comptime T: type,
+    alloc: std.mem.Allocator,
+    context: anytype,
+    start: T,
+    comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(Node(T))) OutOfMemory!void,
+    comptime found: fn (@TypeOf(context), @TypeOf(start)) OutOfMemory!bool, // if true, stop searching
+) OutOfMemory!void {
+    var queue = std.PriorityQueue(Node(T), void, Node(T).comp).init(alloc, {});
+    defer queue.deinit();
+    try queue.add(.{ .cost = 0, .heuristic = 0, .val = start });
+
+    while (queue.removeOrNull()) |node| {
+        if (try found(context, node.val)) return;
+
+        var stalloc = std.heap.stackFallback(1024, alloc);
+        var neighbor_list = std.ArrayList(Node(T)).init(stalloc.get());
+        defer neighbor_list.deinit();
+        try nf(context, node.val, &neighbor_list);
+
+        for (neighbor_list.items) |n| {
+            try queue.add(.{ .cost = n.cost, .heuristic = n.heuristic, .val = n.val });
+        }
+    }
+}
+
+test astar {
+    const NT = [2]i32;
+    const T = struct {
+        latest: ?[2]i32 = null,
+        target: i32 = 0,
+
+        pub fn nf(_: *@This(), point: NT, neighbors: *std.ArrayList(Node(NT))) OutOfMemory!void {
+            if (point[0] < 10 and point[0] >= 0) {
+                try neighbors.append(.{ .cost = 1, .heuristic = 1, .val = .{ point[0] + 1, point[1] + 1 } });
+            }
+        }
+
+        pub fn found(ctx: *@This(), point: [2]i32) OutOfMemory!bool {
+            ctx.latest = point;
+            return point[0] == ctx.target;
+        }
+    };
+
+    const allocator = std.testing.allocator;
+    var tee = T{ .target = 5 };
+    try astar([2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.nf, T.found);
+    try std.testing.expectEqual([2]i32{ 5, 5 }, tee.latest.?);
+}
