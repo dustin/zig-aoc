@@ -55,14 +55,18 @@ test flood {
 /// Do a BFS, calling into a function with each found neighbor.
 pub fn bfs(
     comptime T: type,
+    comptime R: type,
     alloc: std.mem.Allocator,
     context: anytype,
     start: T,
+    comptime rf: fn (@TypeOf(context), @TypeOf(start)) R,
     comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(T)) OutOfMemory!void,
     comptime found: fn (@TypeOf(context), @TypeOf(start)) OutOfMemory!bool, // if true, stop searching
 ) OutOfMemory!void {
     var queue = std.ArrayList(T).init(alloc);
     defer queue.deinit();
+    var seen = std.AutoHashMap(R, void).init(alloc);
+    defer seen.deinit();
     try queue.append(start);
     if (try found(context, start)) return;
     while (queue.pop()) |current| {
@@ -73,9 +77,16 @@ pub fn bfs(
 
         for (neighbor_list.items) |neighbor| {
             if (try found(context, neighbor)) return;
+            if (seen.get(rf(context, neighbor))) |_| continue;
+            try seen.put(rf(context, neighbor), {});
             try queue.append(neighbor);
         }
     }
+}
+
+/// An identity representation function.
+pub fn id(a: anytype) @TypeOf(a) {
+    return a;
 }
 
 test bfs {
@@ -89,6 +100,10 @@ test bfs {
             }
         }
 
+        pub fn rf(_: *@This(), p: [2]i32) i32 {
+            return p[0];
+        }
+
         pub fn found(ctx: *@This(), point: [2]i32) OutOfMemory!bool {
             ctx.latest = point;
             return point[0] == ctx.target;
@@ -97,7 +112,7 @@ test bfs {
 
     const allocator = std.testing.allocator;
     var tee = T{ .target = 5 };
-    try bfs([2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.neighbs, T.found);
+    try bfs([2]i32, i32, allocator, &tee, [2]i32{ 0, 0 }, T.rf, T.neighbs, T.found);
     try std.testing.expectEqual([2]i32{ 5, 5 }, tee.latest.?);
 }
 
