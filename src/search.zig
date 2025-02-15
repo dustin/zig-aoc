@@ -76,17 +76,12 @@ pub fn bfs(
         try nf(context, current, &neighbor_list);
 
         for (neighbor_list.items) |neighbor| {
-            if (try found(context, neighbor)) return;
             if (seen.get(rf(context, neighbor))) |_| continue;
+            if (try found(context, neighbor)) return;
             try seen.put(rf(context, neighbor), {});
             try queue.append(neighbor);
         }
     }
-}
-
-/// An identity representation function.
-pub fn id(a: anytype) @TypeOf(a) {
-    return a;
 }
 
 test bfs {
@@ -131,21 +126,72 @@ pub fn Node(comptime T: type) type {
     };
 }
 
+pub fn AStarResult(comptime T: type, comptime R: type) type {
+    return struct {
+        cost: i32,
+        val: ?T,
+        alloc: std.mem.Allocator,
+        scores: std.AutoHashMap(R, struct { i32, R }),
+
+        fn init(alloc: std.mem.Allocator) @This() {
+            return .{
+                .cost = 0,
+                .val = null,
+                .alloc = alloc,
+                .scores = std.AutoHashMap(R, struct { i32, R }).init(alloc),
+            };
+        }
+
+        pub fn deinit(self: *@This()) void {
+            self.scores.deinit();
+        }
+
+        // resolveAStar :: (Ord r, Monoid c, Ord c) => Map r (c, r) -> r -> r -> Maybe (c,[r])
+        pub fn resolve(self: *@This(), alloc: std.mem.Allocator, start: R, end: R) OutOfMemory!?struct { i32, []R } {
+            const mend = self.scores.get(end);
+            if (mend == null) return null;
+            const finalScore = mend.?.@"0";
+
+            var res = std.ArrayList(R).init(alloc);
+            try res.append(end);
+            var current = end;
+            while (true) {
+                if (std.meta.eql(current, start)) {
+                    break;
+                }
+                const next = self.scores.get(current);
+                if (next) |n| {
+                    try res.insert(0, n.@"1");
+                    current = n.@"1";
+                } else {
+                    break;
+                }
+            }
+
+            return .{ finalScore, try res.toOwnedSlice() };
+        }
+    };
+}
+
 /// Do a A* search, calling into a function with each found neighbor.
 pub fn astar(
     comptime T: type,
+    comptime R: type,
     alloc: std.mem.Allocator,
     context: anytype,
     start: T,
+    comptime rf: fn (@TypeOf(context), @TypeOf(start)) R,
     comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(Node(T))) OutOfMemory!void,
     comptime found: fn (@TypeOf(context), @TypeOf(start)) OutOfMemory!bool, // if true, stop searching
-) OutOfMemory!void {
+) OutOfMemory!AStarResult(T, R) {
     var queue = std.PriorityQueue(Node(T), void, Node(T).comp).init(alloc, {});
     defer queue.deinit();
+    var res = AStarResult(T, R).init(alloc);
+    errdefer res.deinit();
     try queue.add(.{ .cost = 0, .heuristic = 0, .val = start });
 
     while (queue.removeOrNull()) |node| {
-        if (try found(context, node.val)) return;
+        if (try found(context, node.val)) return res;
 
         var stalloc = std.heap.stackFallback(1024, alloc);
         var neighbor_list = std.ArrayList(Node(T)).init(stalloc.get());
@@ -153,31 +199,48 @@ pub fn astar(
         try nf(context, node.val, &neighbor_list);
 
         for (neighbor_list.items) |n| {
-            try queue.add(.{ .cost = n.cost, .heuristic = n.heuristic, .val = n.val });
+            const r = rf(context, n.val);
+            if (res.scores.get(r)) |existing| {
+                if (existing.@"0" < node.cost + n.cost) {
+                    continue;
+                }
+            }
+            try res.scores.put(r, .{ node.cost + n.cost, rf(context, node.val) });
+            try queue.add(.{ .cost = node.cost + n.cost, .heuristic = n.heuristic, .val = n.val });
         }
     }
+    return res;
 }
 
 test astar {
     const NT = [2]i32;
     const T = struct {
-        latest: ?[2]i32 = null,
         target: i32 = 0,
 
         pub fn nf(_: *@This(), point: NT, neighbors: *std.ArrayList(Node(NT))) OutOfMemory!void {
-            if (point[0] < 10 and point[0] >= 0) {
-                try neighbors.append(.{ .cost = 1, .heuristic = 1, .val = .{ point[0] + 1, point[1] + 1 } });
-            }
+            try neighbors.append(.{ .cost = 1, .heuristic = 1, .val = .{ point[0] + 1, point[1] + 1 } });
+            try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] + 1, point[1] - 1 } });
+            try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] + 1 } });
+            try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] - 1 } });
+        }
+        pub fn rf(_: *@This(), p: [2]i32) [2]i32 {
+            return p;
         }
 
         pub fn found(ctx: *@This(), point: [2]i32) OutOfMemory!bool {
-            ctx.latest = point;
             return point[0] == ctx.target;
         }
     };
 
     const allocator = std.testing.allocator;
     var tee = T{ .target = 5 };
-    try astar([2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.nf, T.found);
-    try std.testing.expectEqual([2]i32{ 5, 5 }, tee.latest.?);
+    var res = try astar([2]i32, [2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.rf, T.nf, T.found);
+    defer res.deinit();
+
+    if (try res.resolve(allocator, [2]i32{ 0, 0 }, [2]i32{ 5, 5 })) |p| {
+        defer allocator.free(p.@"1");
+        try std.testing.expectEqual(p.@"0", 5);
+        var exp = [_][2]i32{ .{ 0, 0 }, .{ 1, 1 }, .{ 2, 2 }, .{ 3, 3 }, .{ 4, 4 }, .{ 5, 5 } };
+        try std.testing.expectEqualSlices([2]i32, &exp, p.@"1");
+    }
 }
