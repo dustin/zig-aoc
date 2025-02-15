@@ -34,43 +34,38 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const exe = b.addExecutable(.{
-        .name = "zig-aoc",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
+    const test_step = b.step("test", "Run unit tests");
 
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
-    b.installArtifact(exe);
+    const Puzzle = comptime struct { year: []const u8, day: []const u8 };
 
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
-    const run_cmd = b.addRunArtifact(exe);
+    const puzzles = [_]Puzzle{
+        .{ .year = "2024", .day = "18" },
+    };
 
-    // By making the run step depend on the install step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    // This is not necessary, however, if the application depends on other installed
-    // files, this ensures they will be present and in the expected location.
-    run_cmd.step.dependOn(b.getInstallStep());
+    for (puzzles) |yd| {
+        var namebuf: [64]u8 = undefined;
+        var nbs = std.io.fixedBufferStream(&namebuf);
+        try std.fmt.format(nbs.writer(), "{s}-{s}", .{ yd.year, yd.day });
+        var pathbuf: [64]u8 = undefined;
+        var pbs = std.io.fixedBufferStream(&pathbuf);
+        try std.fmt.format(pbs.writer(), "puzzles/{s}/day{s}.zig", .{ yd.year, yd.day });
+        const exe = b.addExecutable(.{
+            .name = nbs.getWritten(),
+            .root_source_file = b.path(pbs.getWritten()),
+            .target = target,
+            .optimize = optimize,
+        });
+        b.installArtifact(exe);
 
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
+        const exe_unit_tests = b.addTest(.{
+            .root_source_file = b.path(pbs.getWritten()),
+            .target = target,
+            .optimize = optimize,
+        });
+        const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
+        test_step.dependOn(&run_exe_unit_tests.step);
     }
 
-    // This creates a build step. It will be visible in the `zig build --help` menu,
-    // and can be selected like this: `zig build run`
-    // This will evaluate the `run` step rather than the default, which is "install".
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
-
-    // Creates a step for unit testing. This only builds the test executable
-    // but does not run it.
     const lib_unit_tests = b.addTest(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -78,19 +73,10 @@ pub fn build(b: *std.Build) void {
     });
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
-
-    const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
     lib_unit_tests.root_module.addImport("zigthesis", zigthesis.module("zigthesis"));
-    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 
     // Similar to creating the run step earlier, this exposes a `test` step to
     // the `zig build --help` menu, providing a way for the user to request
     // running the unit tests.
-    const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
-    test_step.dependOn(&run_exe_unit_tests.step);
 }
