@@ -101,7 +101,9 @@ test "part2" {
     const at = aoc.search.binSearch(u32, &t, T.compare, 272, 4000);
     try std.testing.expectEqual(2967, at);
 
-    // TODO:  Look up this thing at line 2967 and report the x,y (16,44)
+    const p = st.lines.items[at - 1];
+    try std.testing.expectEqual(p.x, 16);
+    try std.testing.expectEqual(p.y, 44);
 }
 
 pub fn main() !void {}
