@@ -300,7 +300,12 @@ pub fn autoBinSearch(
     const dir = compareFn(context, 0);
     var p: T = 0;
     var l: T = 0;
-    var o: T = if (dir == .lt) 1 else -1;
+    var o: T = 1;
+
+    const typeInfo = @typeInfo(T);
+    if (typeInfo == .int and typeInfo.int.signedness == .signed) {
+        o = if (dir == .lt) 1 else -1;
+    }
 
     while (true) {
         const v = compareFn(context, l);

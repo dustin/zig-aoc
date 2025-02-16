@@ -87,6 +87,9 @@ test "part2" {
         st: *I,
 
         pub fn compare(this: *@This(), val: u32) std.math.Order {
+            if (val > this.st.lines.items.len) {
+                return .gt;
+            }
             var res = this.st.run(val) catch return .lt;
             defer res.deinit();
             if (res.val == null) {
@@ -98,7 +101,7 @@ test "part2" {
     };
 
     var t = T{ .st = &st };
-    const at = aoc.search.binSearch(u32, &t, T.compare, 272, 4000);
+    const at = aoc.search.autoBinSearch(u32, &t, T.compare);
     try std.testing.expectEqual(2967, at);
 
     const p = st.lines.items[at - 1];
