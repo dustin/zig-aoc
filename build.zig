@@ -15,6 +15,10 @@ pub fn build(b: *std.Build) !void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
+    const aoc = b.addModule("aoc", .{
+        .root_source_file = b.path("src/root.zig"),
+    });
+
     const lib = b.addStaticLibrary(.{
         .name = "zig-aoc",
         // In this case the main source file is merely a path, however, in more
@@ -55,6 +59,7 @@ pub fn build(b: *std.Build) !void {
             .target = target,
             .optimize = optimize,
         });
+        exe.root_module.addImport("aoc", aoc);
         b.installArtifact(exe);
 
         const exe_unit_tests = b.addTest(.{
@@ -62,6 +67,7 @@ pub fn build(b: *std.Build) !void {
             .target = target,
             .optimize = optimize,
         });
+        exe_unit_tests.root_module.addImport("aoc", aoc);
         const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
         test_step.dependOn(&run_exe_unit_tests.step);
     }

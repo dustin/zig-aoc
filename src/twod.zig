@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Point = struct {
+pub const Point = struct {
     x: i32,
     y: i32,
 
@@ -45,19 +45,18 @@ const Point = struct {
     pub fn invFwd(this: @This(), dir: Dir) Point {
         return this.invFwdBy(dir, 1);
     }
+
+    pub fn around(p: @This()) [4]Point {
+        return .{
+            .{ .x = p.x, .y = p.y - 1 },
+            .{ .x = p.x + 1, .y = p.y },
+            .{ .x = p.x, .y = p.y + 1 },
+            .{ .x = p.x - 1, .y = p.y },
+        };
+    }
 };
 
-/// Find the points around a given point in clockwise order starting from the top.
-fn around(p: Point) [4]Point {
-    return .{
-        .{ .x = p.x, .y = p.y - 1 },
-        .{ .x = p.x + 1, .y = p.y },
-        .{ .x = p.x, .y = p.y + 1 },
-        .{ .x = p.x - 1, .y = p.y },
-    };
-}
-
-test around {
+test "around a point" {
     const p = Point{ .x = 0, .y = 0 };
     const expected = .{
         Point{ .x = 0, .y = -1 },
@@ -65,7 +64,7 @@ test around {
         Point{ .x = 0, .y = 1 },
         Point{ .x = -1, .y = 0 },
     };
-    try std.testing.expectEqualDeep(expected, around(p));
+    try std.testing.expectEqualDeep(expected, p.around());
 }
 
 /// Points surrounding the given point, including diagonals.
@@ -181,4 +180,40 @@ test "movement" {
     try zigthesis.falsifyWith(T.invMovement, "inverted movement can be undone", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
     try zigthesis.falsifyWith(T.fwdByfwdEquiv, "n fwd == fwdBy n", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
     try zigthesis.falsifyWith(T.invFwdByfwdEquiv, "n invFwd == invFwdBy n", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
+}
+
+pub const Bounds = struct {
+    minX: i32,
+    minY: i32,
+    maxX: i32,
+    maxY: i32,
+
+    pub fn addPoint(this: *@This(), p: Point) void {
+        if (p.x < this.minX) this.minX = p.x;
+        if (p.x > this.maxX) this.maxX = p.x;
+        if (p.y < this.minY) this.minY = p.y;
+        if (p.y > this.maxY) this.maxY = p.y;
+    }
+
+    pub fn contains(this: @This(), p: Point) bool {
+        return p.x >= this.minX and p.x <= this.maxX and p.y >= this.minY and p.y <= this.maxY;
+    }
+};
+
+pub fn newBounds() Bounds {
+    return Bounds{
+        .minX = std.math.maxInt(i32),
+        .minY = std.math.maxInt(i32),
+        .maxX = std.math.minInt(i32),
+        .maxY = std.math.minInt(i32),
+    };
+}
+
+test "bounds checking" {
+    var b: Bounds = newBounds();
+    b.addPoint(Point{ .x = 0, .y = 0 });
+    b.addPoint(Point{ .x = 1, .y = 1 });
+    b.addPoint(Point{ .x = -1, .y = -1 });
+    try std.testing.expectEqual(2, b.maxX - b.minX);
+    try std.testing.expectEqual(2, b.maxY - b.minY);
 }

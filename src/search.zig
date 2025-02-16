@@ -191,6 +191,7 @@ pub fn astar(
     try queue.add(.{ .cost = 0, .heuristic = 0, .val = start });
 
     while (queue.removeOrNull()) |node| {
+        res.cost = node.cost;
         if (try found(context, node.val)) return res;
 
         var stalloc = std.heap.stackFallback(1024, alloc);
@@ -201,7 +202,7 @@ pub fn astar(
         for (neighbor_list.items) |n| {
             const r = rf(context, n.val);
             if (res.scores.get(r)) |existing| {
-                if (existing.@"0" < node.cost + n.cost) {
+                if (existing.@"0" <= node.cost + n.cost) {
                     continue;
                 }
             }
@@ -237,10 +238,95 @@ test astar {
     var res = try astar([2]i32, [2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.rf, T.nf, T.found);
     defer res.deinit();
 
+    try std.testing.expectEqual(5, res.cost);
     if (try res.resolve(allocator, [2]i32{ 0, 0 }, [2]i32{ 5, 5 })) |p| {
         defer allocator.free(p.@"1");
         try std.testing.expectEqual(p.@"0", 5);
         var exp = [_][2]i32{ .{ 0, 0 }, .{ 1, 1 }, .{ 2, 2 }, .{ 3, 3 }, .{ 4, 4 }, .{ 5, 5 } };
         try std.testing.expectEqualSlices([2]i32, &exp, p.@"1");
     }
+}
+
+pub fn binSearch(
+    comptime T: type,
+    context: anytype,
+    comptime compareFn: fn (@TypeOf(context), T) std.math.Order,
+    l: T,
+    h: T,
+) T {
+    var low: T = l;
+    var high: T = h;
+
+    while (high >= low) {
+        const mid = low + @divTrunc((high - low), 2);
+        switch (compareFn(context, mid)) {
+            .gt => high = (mid - 1),
+            .lt => low = (mid + 1),
+            .eq => return mid,
+        }
+    }
+    return low;
+}
+
+test "binary search" {
+    const zigthesis = @import("zigthesis");
+
+    const T = struct {
+        val: i32 = 0,
+
+        pub fn compare(this: @This(), val: i32) std.math.Order {
+            return std.math.order(val, this.val);
+        }
+
+        pub fn sortProp(in: [3]i32) bool {
+            var abc = in;
+            std.sort.pdq(i32, abc[0..], {}, std.sort.asc(i32));
+            const i = @This(){ .val = abc[1] };
+            return binSearch(i32, i, @This().compare, abc[0], abc[1]) == abc[1];
+        }
+    };
+
+    try zigthesis.falsifyWith(T.sortProp, "sorts sort", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
+}
+
+pub fn autoBinSearch(
+    comptime T: type,
+    context: anytype,
+    comptime compareFn: fn (@TypeOf(context), T) std.math.Order,
+) T {
+    const dir = compareFn(context, 0);
+    var p: T = 0;
+    var l: T = 0;
+    var o: T = if (dir == .lt) 1 else -1;
+
+    while (true) {
+        const v = compareFn(context, l);
+        if (v == .eq) return l;
+        if (v == dir) {
+            p = l;
+            l += o;
+            o *= 10;
+        } else {
+            return binSearch(T, context, compareFn, @min(p, l), @max(p, l));
+        }
+    }
+}
+
+test "auto binary search" {
+    const zigthesis = @import("zigthesis");
+
+    const T = struct {
+        val: i32 = 0,
+
+        pub fn compare(this: @This(), val: i32) std.math.Order {
+            return std.math.order(val, this.val);
+        }
+
+        pub fn autoSortProp(in: i32) bool {
+            const i = @This(){ .val = in };
+            return autoBinSearch(i32, i, @This().compare) == in;
+        }
+    };
+
+    try zigthesis.falsifyWith(T.autoSortProp, "auto sorts sort", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
 }
