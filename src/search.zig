@@ -191,8 +191,11 @@ pub fn astar(
     try queue.add(.{ .cost = 0, .heuristic = 0, .val = start });
 
     while (queue.removeOrNull()) |node| {
-        res.cost = node.cost;
-        if (try found(context, node.val)) return res;
+        if (try found(context, node.val)) {
+            res.cost = node.cost;
+            res.val = node.val;
+            return res;
+        }
 
         var stalloc = std.heap.stackFallback(1024, alloc);
         var neighbor_list = std.ArrayList(Node(T)).init(stalloc.get());
