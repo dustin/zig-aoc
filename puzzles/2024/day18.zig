@@ -1,32 +1,13 @@
 const std = @import("std");
 const aoc = @import("aoc");
 
-const I = struct {
-    lineCount: u32 = 0,
-    maxLines: u32 = 0,
-    bounds: aoc.twod.Bounds = aoc.twod.newBounds(),
+const Point = aoc.twod.Point;
+
+const A = struct {
     pointMap: std.AutoHashMap(aoc.twod.Point, void) = undefined,
+    bounds: aoc.twod.Bounds = aoc.twod.Bounds{ .minX = 0, .minY = 0, .maxX = 70, .maxY = 70 },
 
-    pub fn parseLine(this: *@This(), line: []const u8) aoc.input.ParseError!bool {
-        if (this.lineCount == this.maxLines) {
-            return false;
-        }
-        this.lineCount += 1;
-
-        var p = aoc.twod.Point{ .x = 0, .y = 0 };
-        var it = std.mem.splitSequence(u8, line, ",");
-        p.x = try aoc.input.parseInt(i32, it.next() orelse return false);
-        p.y = try aoc.input.parseInt(i32, it.next() orelse return false);
-        this.pointMap.put(p, void{}) catch return error.ParseError;
-        this.bounds.addPoint(p);
-        return true;
-    }
-
-    pub fn rf(_: *@This(), p: aoc.twod.Point) aoc.twod.Point {
-        return p;
-    }
-
-    pub fn nf(this: *@This(), p: aoc.twod.Point, neighbors: *std.ArrayList(aoc.search.Node(aoc.twod.Point))) aoc.search.OutOfMemory!void {
+    pub fn nf(this: *@This(), p: Point, neighbors: *std.ArrayList(aoc.search.Node(Point))) aoc.search.OutOfMemory!void {
         for (p.around()) |np| {
             if (this.bounds.contains(np) and this.pointMap.get(np) == null) {
                 try neighbors.append(.{ .cost = 1, .heuristic = 1, .val = np });
@@ -34,35 +15,79 @@ const I = struct {
         }
     }
 
-    pub fn found(this: *@This(), p: aoc.twod.Point) aoc.search.OutOfMemory!bool {
+    pub fn rf(_: *@This(), p: Point) Point {
+        return p;
+    }
+
+    pub fn found(this: *@This(), p: Point) aoc.search.OutOfMemory!bool {
         return p.x == this.bounds.maxX and p.y == this.bounds.maxY;
+    }
+
+    pub fn deinit(this: *A) void {
+        this.pointMap.deinit();
     }
 };
 
-fn run(alloc: std.mem.Allocator, maxLines: u32) !aoc.search.AStarResult(aoc.twod.Point, aoc.twod.Point) {
-    var i = I{ .maxLines = maxLines, .pointMap = std.AutoHashMap(aoc.twod.Point, void).init(alloc) };
-    defer i.pointMap.deinit();
+const I = struct {
+    alloc: std.mem.Allocator,
+    lines: std.ArrayList(Point),
 
-    try aoc.input.parseLines("input/2024/day18", &i, I.parseLine);
+    pub fn parseLine(this: *@This(), line: []const u8) aoc.input.ParseError!bool {
+        var p = Point{ .x = 0, .y = 0 };
+        var it = std.mem.splitSequence(u8, line, ",");
+        p.x = try aoc.input.parseInt(i32, it.next() orelse return false);
+        p.y = try aoc.input.parseInt(i32, it.next() orelse return false);
+        try this.lines.append(p);
+        return true;
+    }
 
-    i.bounds.maxX = 70;
-    i.bounds.maxY = 70;
+    pub fn init(this: *@This(), alloc: std.mem.Allocator, p: []const u8) !I {
+        this.alloc = alloc;
+        this.lines = std.ArrayList(Point).init(alloc);
+        try aoc.input.parseLines(p, this, I.parseLine);
+        return this.*;
+    }
 
-    const start = aoc.twod.Point{ .x = i.bounds.minX, .y = i.bounds.minY };
+    pub fn deinit(this: *I) void {
+        this.lines.deinit();
+    }
 
-    return aoc.search.astar(aoc.twod.Point, aoc.twod.Point, alloc, &i, start, I.rf, I.nf, I.found);
+    pub fn run(this: *@This(), maxLines: u32) !aoc.search.AStarResult(Point, Point) {
+        var a = A{ .pointMap = std.AutoHashMap(aoc.twod.Point, void).init(this.alloc) };
+        defer a.deinit();
+        for (this.lines.items[0..maxLines]) |p| {
+            a.pointMap.put(p, void{}) catch return error.ParseError;
+        }
+        const start = Point{ .x = 0, .y = 0 };
+
+        return aoc.search.astar(Point, Point, this.alloc, &a, start, A.rf, A.nf, A.found);
+    }
+};
+
+const filePath: []const u8 = "input/2024/day18";
+
+fn newI(alloc: std.mem.Allocator, p: []const u8) !I {
+    var i = I{ .alloc = alloc, .lines = undefined };
+    return i.init(alloc, p);
 }
 
 test "part1" {
-    var res = try run(std.testing.allocator, 1024);
+    var st = try newI(std.testing.allocator, filePath);
+    defer st.deinit();
+    var res = try st.run(1024);
     defer res.deinit();
     try std.testing.expectEqual(res.cost, 272);
 }
 
 test "part2" {
+    var st = try newI(std.testing.allocator, filePath);
+    defer st.deinit();
+
     const T = struct {
-        pub fn compare(_: void, val: u32) std.math.Order {
-            var res = run(std.testing.allocator, val) catch return .lt;
+        st: *I,
+
+        pub fn compare(this: *@This(), val: u32) std.math.Order {
+            var res = this.st.run(val) catch return .lt;
             defer res.deinit();
             if (res.val == null) {
                 return .gt;
@@ -72,7 +97,8 @@ test "part2" {
         }
     };
 
-    const at = aoc.search.binSearch(u32, {}, T.compare, 272, 4000);
+    var t = T{ .st = &st };
+    const at = aoc.search.binSearch(u32, &t, T.compare, 272, 4000);
     try std.testing.expectEqual(2967, at);
 
     // TODO:  Look up this thing at line 2967 and report the x,y (16,44)

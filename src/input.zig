@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const ParseError = error{ParseError};
+pub const ParseError = error{ ParseError, OutOfMemory };
 
 /// Parse lines from a file.
 pub fn parseLines(path: []const u8, context: anytype, parseFun: fn (ctx: @TypeOf(context), line: []const u8) ParseError!bool) !void {
