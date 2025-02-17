@@ -1,6 +1,7 @@
 pub const search = @import("search.zig");
 pub const twod = @import("twod.zig");
 pub const input = @import("input.zig");
+pub const grid = @import("grid.zig");
 
 const std = @import("std");
 
@@ -9,6 +10,7 @@ comptime {
         _ = search;
         _ = twod;
         _ = input;
+        _ = grid;
     }
 }
 
