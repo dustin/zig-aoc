@@ -45,6 +45,7 @@ pub fn build(b: *std.Build) !void {
     const puzzles = [_]Puzzle{
         .{ .year = "2024", .day = "1" },
         .{ .year = "2024", .day = "2" },
+        .{ .year = "2024", .day = "4" },
         .{ .year = "2024", .day = "18" },
     };
 

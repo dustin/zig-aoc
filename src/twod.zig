@@ -54,6 +54,20 @@ pub const Point = struct {
             .{ .x = p.x - 1, .y = p.y },
         };
     }
+
+    /// Points surrounding the given point, including diagonals.
+    pub fn aroundD(p: @This()) [8]Point {
+        return .{
+            .{ .x = p.x - 1, .y = p.y - 1 },
+            .{ .x = p.x, .y = p.y - 1 },
+            .{ .x = p.x + 1, .y = p.y - 1 },
+            .{ .x = p.x + 1, .y = p.y },
+            .{ .x = p.x + 1, .y = p.y + 1 },
+            .{ .x = p.x, .y = p.y + 1 },
+            .{ .x = p.x - 1, .y = p.y + 1 },
+            .{ .x = p.x - 1, .y = p.y },
+        };
+    }
 };
 
 test "around a point" {
@@ -67,21 +81,7 @@ test "around a point" {
     try std.testing.expectEqualDeep(expected, p.around());
 }
 
-/// Points surrounding the given point, including diagonals.
-fn aroundD(p: Point) [8]Point {
-    return .{
-        .{ .x = p.x - 1, .y = p.y - 1 },
-        .{ .x = p.x, .y = p.y - 1 },
-        .{ .x = p.x + 1, .y = p.y - 1 },
-        .{ .x = p.x + 1, .y = p.y },
-        .{ .x = p.x + 1, .y = p.y + 1 },
-        .{ .x = p.x, .y = p.y + 1 },
-        .{ .x = p.x - 1, .y = p.y + 1 },
-        .{ .x = p.x - 1, .y = p.y },
-    };
-}
-
-test aroundD {
+test "around a point diagonally" {
     const p = Point{ .x = 0, .y = 0 };
     const expected = .{
         Point{ .x = -1, .y = -1 },
@@ -93,7 +93,7 @@ test aroundD {
         Point{ .x = -1, .y = 1 },
         Point{ .x = -1, .y = 0 },
     };
-    try std.testing.expectEqualDeep(expected, aroundD(p));
+    try std.testing.expectEqualDeep(expected, p.aroundD());
 }
 
 /// Directions in clockwise order starting from the top.

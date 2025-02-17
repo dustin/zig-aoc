@@ -82,6 +82,7 @@ test parseGrid {
     defer al.deinit();
     var it = grid.iterate();
     while (it.next()) {
+        try std.testing.expectEqual(it.value, grid.lookup(it.point).?);
         try al.append(Item{ .x = it.point.x, .y = it.point.y, .v = it.value });
     }
     const exp = [_]Item{
