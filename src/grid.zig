@@ -34,7 +34,7 @@ pub const Grid = struct {
     }
 
     pub fn iterate(this: @This()) GridIterator {
-        return .{ .grid = this, .point = .{ .x = -1, .y = 0 }, .value = this.bytes[0] };
+        return .{ .grid = this, .point = .{ .x = -1, .y = 0 }, .value = 0 };
     }
 };
 
@@ -62,7 +62,7 @@ pub fn parseGrid(input: []const u8) ?Grid {
 
 test parseGrid {
     const input = "ABC\nDEF\nGHI\n";
-    const grid = parseGrid(input).?;
+    const grid = parseGrid(input) orelse return error.ParseError;
     const expected = Grid{
         .bounds = twod.Bounds{
             .minX = 0,
@@ -76,8 +76,53 @@ test parseGrid {
     try std.testing.expectEqual('F', grid.lookup(.{ .x = 2, .y = 1 }).?);
     try std.testing.expectEqual(null, grid.lookup(.{ .x = 3, .y = 1 }));
 
+    const Item = struct { x: i32, y: i32, v: u8 };
+
+    var al = std.ArrayList(Item).init(std.testing.allocator);
+    defer al.deinit();
     var it = grid.iterate();
     while (it.next()) {
-        std.debug.print("({d},{d}): {c}\n", .{ it.point.x, it.point.y, it.value });
+        try al.append(Item{ .x = it.point.x, .y = it.point.y, .v = it.value });
     }
+    const exp = [_]Item{
+        .{ .x = 0, .y = 0, .v = 'A' },
+        .{ .x = 1, .y = 0, .v = 'B' },
+        .{ .x = 2, .y = 0, .v = 'C' },
+        .{ .x = 0, .y = 1, .v = 'D' },
+        .{ .x = 1, .y = 1, .v = 'E' },
+        .{ .x = 2, .y = 1, .v = 'F' },
+        .{ .x = 0, .y = 2, .v = 'G' },
+        .{ .x = 1, .y = 2, .v = 'H' },
+        .{ .x = 2, .y = 2, .v = 'I' },
+    };
+    try std.testing.expectEqualSlices(Item, &exp, al.items);
+}
+
+/// A grid parsed from a file.
+pub const FileGrid = struct {
+    alloc: std.mem.Allocator,
+    grid: Grid,
+
+    pub fn deinit(this: *FileGrid) void {
+        this.alloc.free(this.grid.bytes);
+    }
+};
+
+/// Open a file and parse it as a grid.
+pub fn openFileGrid(alloc: std.mem.Allocator, path: []const u8) !FileGrid {
+    const file = try std.fs.cwd().openFile(path, .{});
+    defer file.close();
+
+    const contents = try file.readToEndAlloc(alloc, 65536);
+
+    return FileGrid{
+        .alloc = alloc,
+        .grid = parseGrid(contents) orelse return error.ParseError,
+    };
+}
+
+test openFileGrid {
+    var fg = try openFileGrid(std.testing.allocator, "input/2024/day4.ex");
+    defer fg.deinit();
+    try std.testing.expectEqual('X', fg.grid.lookup(.{ .x = 4, .y = 1 }).?);
 }
