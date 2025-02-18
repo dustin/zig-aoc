@@ -13,7 +13,8 @@ test "part1" {
     defer computer.deinit();
     try computer.set(1, 12);
     try computer.set(2, 2);
-    try computer.runTilHalt();
+    const ran = try computer.run();
+    try std.testing.expectEqual(ran, .Halted);
     try std.testing.expectEqual(3931283, computer.at(0));
 }
 
@@ -28,7 +29,7 @@ test "part2" {
             this.computer.reset();
             this.computer.set(1, @divTrunc(val, 100)) catch return .gt;
             this.computer.set(2, @mod(val, 100)) catch return .gt;
-            this.computer.runTilHalt() catch return .gt;
+            _ = this.computer.run() catch return .gt;
             return std.math.order(this.computer.at(0), 19690720);
         }
     };

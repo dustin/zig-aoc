@@ -1,10 +1,30 @@
 const std = @import("std");
 const aoc = @import("aoc");
 
+pub const ReturnMode = union(enum) {
+    Continue: void,
+    Halted: void,
+    Input: i32,
+};
+
+pub const AddrMode = enum {
+    Position,
+    Immediate,
+};
+
+fn resolveOp(op: i32) AddrMode {
+    return switch (@mod(op, 10)) {
+        0 => .Position,
+        1 => .Immediate,
+        else => std.debug.panic("invalid addr mode: {d}\n", .{op}),
+    };
+}
+
 pub const Computer = struct {
     alloc: std.mem.Allocator,
     rom: []const i32,
     mem: std.AutoHashMap(i32, i32),
+    output: std.ArrayList(i32),
 
     pc: i32 = 0,
 
@@ -19,22 +39,101 @@ pub const Computer = struct {
     pub fn deinit(this: *@This()) void {
         this.mem.deinit();
         this.alloc.free(this.rom);
+        this.output.deinit();
     }
 
-    pub fn runOne(this: *@This()) !void {
-        const op = this.at(this.pc);
+    fn arg(this: @This(), argNum: u4, mode: AddrMode, addr: i32) i32 {
+        const val = this.at(addr + argNum + 1);
+        return switch (mode) {
+            .Position => this.at(val),
+            .Immediate => val,
+        };
+    }
+
+    // Opcode 5 is jump-if-true: if the first parameter is non-zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
+    // Opcode 6 is jump-if-false: if the first parameter is zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
+    // Opcode 7 is less than: if the first parameter is less than the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
+    // Opcode 8 is equals: if the first parameter is equal to the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
+
+    pub fn runOne(this: *@This()) !ReturnMode {
+        const rawOp = this.at(this.pc);
+        const op = @mod(rawOp, 100);
+        const modes: [3]AddrMode = .{
+            resolveOp(@divTrunc(rawOp, 100)),
+            resolveOp(@divTrunc(rawOp, 1000)),
+            resolveOp(@divTrunc(rawOp, 10000)),
+        };
+
         switch (op) {
             1, 2 => {
-                const a = this.at(this.at(this.pc + 1));
-                const b = this.at(this.at(this.pc + 2));
+                const a = this.arg(0, modes[0], this.pc);
+                const b = this.arg(1, modes[1], this.pc);
                 const c = this.at(this.pc + 3);
                 const rv = if (op == 1) a + b else a * b;
                 try this.set(c, rv);
                 this.pc += 4;
+                return .Continue;
             },
-            99 => {},
+            3 => {
+                const addr = this.at(this.pc + 1);
+                this.pc += 2;
+                return .{ .Input = addr };
+            },
+            4 => {
+                const addr = this.at(this.pc + 1);
+                const val = this.at(addr);
+                try this.output.append(val);
+                this.pc += 2;
+                return .Continue;
+            },
+            5 => {
+                const a = this.arg(0, modes[0], this.pc);
+                const b = this.arg(1, modes[1], this.pc);
+                if (a != 0) {
+                    this.pc = b;
+                } else {
+                    this.pc += 3;
+                }
+                return .Continue;
+            },
+            6 => {
+                const a = this.arg(0, modes[0], this.pc);
+                const b = this.arg(1, modes[1], this.pc);
+                if (a == 0) {
+                    this.pc = b;
+                } else {
+                    this.pc += 3;
+                }
+                return .Continue;
+            },
+            7 => {
+                const a = this.arg(0, modes[0], this.pc);
+                const b = this.arg(1, modes[1], this.pc);
+                const c = this.at(this.pc + 3);
+                if (a < b) {
+                    try this.set(c, 1);
+                } else {
+                    try this.set(c, 0);
+                }
+                this.pc += 4;
+                return .Continue;
+            },
+            8 => {
+                const a = this.arg(0, modes[0], this.pc);
+                const b = this.arg(1, modes[1], this.pc);
+                const c = this.at(this.pc + 3);
+                if (a == b) {
+                    try this.set(c, 1);
+                } else {
+                    try this.set(c, 0);
+                }
+                this.pc += 4;
+                return .Continue;
+            },
+            99 => return .Halted,
             else => std.debug.panic("unhandled opcode: {d}\n", .{op}),
         }
+        return .Halted;
     }
 
     /// Reset the computer to its initial state.
@@ -44,9 +143,12 @@ pub const Computer = struct {
         this.mem = std.AutoHashMap(i32, i32).init(this.alloc);
     }
 
-    pub fn runTilHalt(this: *@This()) !void {
-        while (this.at(this.pc) != 99) {
-            try this.runOne();
+    pub fn run(this: *@This()) !ReturnMode {
+        while (true) {
+            const rv = try this.runOne();
+            if (rv != .Continue) {
+                return rv;
+            }
         }
     }
 };
@@ -54,7 +156,12 @@ pub const Computer = struct {
 pub fn newComputer(alloc: std.mem.Allocator, mem: []const i32) !Computer {
     const rom = try alloc.alloc(i32, mem.len);
     std.mem.copyForwards(i32, rom, mem);
-    return .{ .alloc = alloc, .mem = std.AutoHashMap(i32, i32).init(alloc), .rom = rom };
+    return .{
+        .alloc = alloc,
+        .mem = std.AutoHashMap(i32, i32).init(alloc),
+        .rom = rom,
+        .output = std.ArrayList(i32).init(alloc),
+    };
 }
 
 pub fn readFile(alloc: std.mem.Allocator, path: []const u8) !Computer {
@@ -95,17 +202,32 @@ test "computer memory" {
 test "single op" {
     var c = try newComputer(std.testing.allocator, &[_]i32{ 1, 5, 6, 0, 99, 3, 7 });
     defer c.deinit();
-    try c.runOne();
+    var ran = try c.runOne();
+    try std.testing.expectEqual(.Continue, ran);
     try std.testing.expectEqual(10, c.at(0));
     try c.set(0, 2);
     c.pc = 0;
-    try c.runOne();
+    ran = try c.runOne();
+    try std.testing.expectEqual(.Continue, ran);
     try std.testing.expectEqual(21, c.at(0));
+}
+
+test "immediate op" {
+    var c = try newComputer(std.testing.allocator, &[_]i32{ 101, 5, 6, 0, 99, 3, 7 });
+    defer c.deinit();
+    _ = try c.runOne();
+    try std.testing.expectEqual(12, c.at(0));
+
+    var c2 = try newComputer(std.testing.allocator, &[_]i32{ 1001, 5, 6, 0, 99, 3, 7 });
+    defer c2.deinit();
+    _ = try c2.runOne();
+    try std.testing.expectEqual(9, c2.at(0));
 }
 
 test "all ops" {
     var c = try newComputer(std.testing.allocator, &[_]i32{ 1, 5, 6, 0, 99, 3, 7 });
     defer c.deinit();
-    try c.runTilHalt();
+    const ran = try c.run();
+    try std.testing.expectEqual(.Halted, ran);
     try std.testing.expectEqual(10, c.at(0));
 }
