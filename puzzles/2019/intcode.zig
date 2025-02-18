@@ -37,6 +37,13 @@ pub const Computer = struct {
         }
     }
 
+    /// Reset the computer to its initial state.
+    pub fn reset(this: *@This()) void {
+        this.pc = 0;
+        this.mem.deinit();
+        this.mem = std.AutoHashMap(i32, i32).init(this.alloc);
+    }
+
     pub fn runTilHalt(this: *@This()) !void {
         while (this.at(this.pc) != 99) {
             try this.runOne();
