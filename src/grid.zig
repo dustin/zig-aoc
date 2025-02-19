@@ -1,14 +1,18 @@
 const std = @import("std");
 const twod = @import("twod.zig");
 
+pub const PointValue = struct {
+    point: twod.Point,
+    value: u8,
+};
+
 pub const GridIterator = struct {
     grid: Grid,
     point: twod.Point,
-    value: u8,
 
-    pub fn next(this: *GridIterator) bool {
+    pub fn next(this: *GridIterator) ?PointValue {
         if (this.point.x == this.grid.bounds.maxX and this.point.y == this.grid.bounds.maxY) {
-            return false;
+            return null;
         }
         if (this.point.x == this.grid.bounds.maxX) {
             this.point.x = 0;
@@ -16,8 +20,10 @@ pub const GridIterator = struct {
         } else {
             this.point.x += 1;
         }
-        this.value = this.grid.lookup(this.point).?;
-        return true;
+        if (this.grid.lookup(this.point)) |v| {
+            return .{ .point = this.point, .value = v };
+        }
+        return null;
     }
 };
 
@@ -34,7 +40,7 @@ pub const Grid = struct {
     }
 
     pub fn iterate(this: @This()) GridIterator {
-        return .{ .grid = this, .point = .{ .x = -1, .y = 0 }, .value = 0 };
+        return .{ .grid = this, .point = .{ .x = -1, .y = 0 } };
     }
 };
 
@@ -81,9 +87,9 @@ test parseGrid {
     var al = std.ArrayList(Item).init(std.testing.allocator);
     defer al.deinit();
     var it = grid.iterate();
-    while (it.next()) {
-        try std.testing.expectEqual(it.value, grid.lookup(it.point).?);
-        try al.append(Item{ .x = it.point.x, .y = it.point.y, .v = it.value });
+    while (it.next()) |pv| {
+        try std.testing.expectEqual(pv.value, grid.lookup(pv.point));
+        try al.append(Item{ .x = pv.point.x, .y = pv.point.y, .v = pv.value });
     }
     const exp = [_]Item{
         .{ .x = 0, .y = 0, .v = 'A' },

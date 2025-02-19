@@ -11,15 +11,15 @@ test "part1" {
     var christmases: u16 = 0;
 
     var it = fg.grid.iterate();
-    while (it.next()) {
-        if (it.value != 'X') {
+    while (it.next()) |pv| {
+        if (pv.value != 'X') {
             continue;
         }
 
         for (dirs) |dir| {
-            const m = fg.grid.lookup(it.point.add(dir)) orelse continue;
-            const a = fg.grid.lookup(it.point.add(dir.mult(2))) orelse continue;
-            const s = fg.grid.lookup(it.point.add(dir.mult(3))) orelse continue;
+            const m = fg.grid.lookup(pv.point.add(dir)) orelse continue;
+            const a = fg.grid.lookup(pv.point.add(dir.mult(2))) orelse continue;
+            const s = fg.grid.lookup(pv.point.add(dir.mult(3))) orelse continue;
             if (m == 'M' and a == 'A' and s == 'S') {
                 christmases += 1;
             }
@@ -36,8 +36,8 @@ test "part2" {
     var christmases: u16 = 0;
 
     var it = fg.grid.iterate();
-    while (it.next()) {
-        if (it.value != 'A') {
+    while (it.next()) |pv| {
+        if (pv.value != 'A') {
             continue;
         }
 
@@ -45,10 +45,10 @@ test "part2" {
         //  p
         // c d
 
-        const a = fg.grid.lookup(it.point.add(.{ .x = -1, .y = -1 })) orelse continue;
-        const b = fg.grid.lookup(it.point.add(.{ .x = 1, .y = -1 })) orelse continue;
-        const c = fg.grid.lookup(it.point.add(.{ .x = -1, .y = 1 })) orelse continue;
-        const d = fg.grid.lookup(it.point.add(.{ .x = 1, .y = 1 })) orelse continue;
+        const a = fg.grid.lookup(pv.point.add(.{ .x = -1, .y = -1 })) orelse continue;
+        const b = fg.grid.lookup(pv.point.add(.{ .x = 1, .y = -1 })) orelse continue;
+        const c = fg.grid.lookup(pv.point.add(.{ .x = -1, .y = 1 })) orelse continue;
+        const d = fg.grid.lookup(pv.point.add(.{ .x = 1, .y = 1 })) orelse continue;
 
         if (@min(a, d) == 'M' and @max(a, d) == 'S' and @min(b, c) == 'M' and @max(b, c) == 'S') {
             christmases += 1;
