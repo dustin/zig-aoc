@@ -6,11 +6,12 @@ const Point = aoc.twod.Point;
 const A = struct {
     pointMap: std.AutoHashMap(aoc.twod.Point, void) = undefined,
     bounds: aoc.twod.Bounds = aoc.twod.Bounds{ .minX = 0, .minY = 0, .maxX = 70, .maxY = 70 },
+    dest: Point = Point{ .x = 70, .y = 70 },
 
     pub fn nf(this: *@This(), p: Point, neighbors: *std.ArrayList(aoc.search.Node(Point))) aoc.search.OutOfMemory!void {
         for (p.around()) |np| {
             if (this.bounds.contains(np) and this.pointMap.get(np) == null) {
-                try neighbors.append(.{ .cost = 1, .heuristic = 1, .val = np });
+                try neighbors.append(.{ .cost = 1, .heuristic = @intCast(this.dest.dist(np)), .val = np });
             }
         }
     }

@@ -118,10 +118,7 @@ pub fn Node(comptime T: type) type {
         val: T,
 
         fn comp(_: void, a: @This(), b: @This()) std.math.Order {
-            if (a.cost == b.cost) {
-                return std.math.order(a.heuristic, b.heuristic);
-            }
-            return std.math.order(a.cost, b.cost);
+            return std.math.order(a.cost + a.heuristic, b.cost + b.heuristic);
         }
     };
 }
@@ -146,7 +143,6 @@ pub fn AStarResult(comptime T: type, comptime R: type) type {
             self.scores.deinit();
         }
 
-        // resolveAStar :: (Ord r, Monoid c, Ord c) => Map r (c, r) -> r -> r -> Maybe (c,[r])
         pub fn resolve(self: *@This(), alloc: std.mem.Allocator, start: R, end: R) OutOfMemory!?struct { i32, []R } {
             const mend = self.scores.get(end);
             if (mend == null) return null;
