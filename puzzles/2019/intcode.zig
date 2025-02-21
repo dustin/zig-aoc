@@ -50,11 +50,6 @@ pub const Computer = struct {
         };
     }
 
-    // Opcode 5 is jump-if-true: if the first parameter is non-zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
-    // Opcode 6 is jump-if-false: if the first parameter is zero, it sets the instruction pointer to the value from the second parameter. Otherwise, it does nothing.
-    // Opcode 7 is less than: if the first parameter is less than the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
-    // Opcode 8 is equals: if the first parameter is equal to the second parameter, it stores 1 in the position given by the third parameter. Otherwise, it stores 0.
-
     pub fn runOne(this: *@This()) !ReturnMode {
         const rawOp = this.at(this.pc);
         const op = @mod(rawOp, 100);
@@ -110,11 +105,7 @@ pub const Computer = struct {
                 const a = this.arg(0, modes[0], this.pc);
                 const b = this.arg(1, modes[1], this.pc);
                 const c = this.at(this.pc + 3);
-                if (a < b) {
-                    try this.set(c, 1);
-                } else {
-                    try this.set(c, 0);
-                }
+                try this.set(c, if (a < b) 1 else 0);
                 this.pc += 4;
                 return .Continue;
             },
@@ -122,11 +113,7 @@ pub const Computer = struct {
                 const a = this.arg(0, modes[0], this.pc);
                 const b = this.arg(1, modes[1], this.pc);
                 const c = this.at(this.pc + 3);
-                if (a == b) {
-                    try this.set(c, 1);
-                } else {
-                    try this.set(c, 0);
-                }
+                try this.set(c, if (a == b) 1 else 0);
                 this.pc += 4;
                 return .Continue;
             },
