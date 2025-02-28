@@ -40,27 +40,62 @@ pub fn build(b: *std.Build) !void {
 
     const test_step = b.step("test", "Run unit tests");
 
-    const Puzzle = comptime struct { year: []const u8, day: []const u8 };
-
-    const puzzles = [_]Puzzle{
-        .{ .year = "2019", .day = "2" },
-        .{ .year = "2019", .day = "5" },
-        .{ .year = "2024", .day = "1" },
-        .{ .year = "2024", .day = "2" },
-        .{ .year = "2024", .day = "4" },
-        .{ .year = "2024", .day = "18" },
+    // Replace the hard-coded list with dynamic discovery from the filesystem.
+    const Puzzle = struct {
+        year: []const u8,
+        day: []const u8,
+        path: []const u8,
     };
 
-    for (puzzles) |yd| {
+    var puzzle_files = std.ArrayList(Puzzle).init(b.allocator);
+    defer puzzle_files.deinit();
+
+    // Open the puzzles directory and iterate its entries.
+    var puzzles_dir = std.fs.cwd().openDir("puzzles", .{ .iterate = true }) catch |err| {
+        std.debug.print("Failed to open puzzles directory: {}\n", .{err});
+        return;
+    };
+    defer puzzles_dir.close();
+
+    var year_iter = puzzles_dir.iterate();
+    while (try year_iter.next()) |year_entry| {
+        if (year_entry.kind != .directory) continue;
+        const year = year_entry.name;
+
+        // Open each year subdirectory.
+        const year_path = try std.fmt.allocPrint(b.allocator, "puzzles/{s}", .{year});
+        var year_dir = std.fs.cwd().openDir(year_path, .{ .iterate = true }) catch |err| {
+            std.debug.print("Failed to open {s} directory: {}\n", .{ year, err });
+            continue;
+        };
+        defer year_dir.close();
+
+        var file_iter = year_dir.iterate();
+        while (try file_iter.next()) |file_entry| {
+            if (file_entry.kind != .file) continue;
+            const name = file_entry.name;
+            // Look for files starting with "day" and ending with ".zig"
+            if (std.mem.startsWith(u8, name, "day") and std.mem.endsWith(u8, name, ".zig")) {
+                // Extract the day string from "day<number>.zig"
+                const day = name[3 .. name.len - 4];
+                const path = try std.fmt.allocPrint(b.allocator, "puzzles/{s}/{s}", .{ year, name });
+                try puzzle_files.append(Puzzle{
+                    .year = try b.allocator.dupe(u8, year),
+                    .day = try b.allocator.dupe(u8, day),
+                    .path = path,
+                });
+            }
+        }
+    }
+
+    // Create executables and tests from the discovered puzzle_files list.
+    for (puzzle_files.items) |pf| {
         var namebuf: [64]u8 = undefined;
         var nbs = std.io.fixedBufferStream(&namebuf);
-        try std.fmt.format(nbs.writer(), "{s}-{s}", .{ yd.year, yd.day });
-        var pathbuf: [64]u8 = undefined;
-        var pbs = std.io.fixedBufferStream(&pathbuf);
-        try std.fmt.format(pbs.writer(), "puzzles/{s}/day{s}.zig", .{ yd.year, yd.day });
+        try std.fmt.format(nbs.writer(), "{s}-{s}", .{ pf.year, pf.day });
         const exe = b.addExecutable(.{
             .name = nbs.getWritten(),
-            .root_source_file = b.path(pbs.getWritten()),
+            .root_source_file = b.path(pf.path),
             .target = target,
             .optimize = optimize,
         });
@@ -68,7 +103,7 @@ pub fn build(b: *std.Build) !void {
         b.installArtifact(exe);
 
         const exe_unit_tests = b.addTest(.{
-            .root_source_file = b.path(pbs.getWritten()),
+            .root_source_file = b.path(pf.path),
             .target = target,
             .optimize = optimize,
         });
