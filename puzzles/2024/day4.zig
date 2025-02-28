@@ -57,3 +57,5 @@ test "part2" {
 
     try std.testing.expectEqual(1835, christmases);
 }
+
+pub fn main() void {}

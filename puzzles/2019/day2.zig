@@ -42,3 +42,5 @@ test "part2" {
     const afound = aoc.search.autoBinSearch(i32, &t, T.compare);
     try std.testing.expectEqual(6979, afound);
 }
+
+pub fn main() void {}
