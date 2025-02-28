@@ -109,5 +109,3 @@ test "part2" {
     try std.testing.expectEqual(p.x, 16);
     try std.testing.expectEqual(p.y, 44);
 }
-
-pub fn main() !void {}

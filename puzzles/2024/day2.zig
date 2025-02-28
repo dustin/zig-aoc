@@ -96,5 +96,3 @@ test "part2" {
 
     try std.testing.expectEqual(544, count);
 }
-
-pub fn main() void {}

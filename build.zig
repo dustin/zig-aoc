@@ -90,17 +90,26 @@ pub fn build(b: *std.Build) !void {
 
     // Create executables and tests from the discovered puzzle_files list.
     for (puzzle_files.items) |pf| {
-        var namebuf: [64]u8 = undefined;
-        var nbs = std.io.fixedBufferStream(&namebuf);
-        try std.fmt.format(nbs.writer(), "{s}-{s}", .{ pf.year, pf.day });
-        const exe = b.addExecutable(.{
-            .name = nbs.getWritten(),
-            .root_source_file = b.path(pf.path),
-            .target = target,
-            .optimize = optimize,
-        });
-        exe.root_module.addImport("aoc", aoc);
-        b.installArtifact(exe);
+
+        // If there's a main, let's build an executable.
+        const puzzle_file = try std.fs.cwd().openFile(pf.path, .{});
+        defer puzzle_file.close();
+        const content = try puzzle_file.readToEndAlloc(b.allocator, 64 * 1024 * 1024);
+        defer b.allocator.free(content);
+
+        if (std.mem.indexOf(u8, content, "pub fn main") != null) {
+            var namebuf: [64]u8 = undefined;
+            var nbs = std.io.fixedBufferStream(&namebuf);
+            try std.fmt.format(nbs.writer(), "{s}-{s}", .{ pf.year, pf.day });
+            const exe = b.addExecutable(.{
+                .name = nbs.getWritten(),
+                .root_source_file = b.path(pf.path),
+                .target = target,
+                .optimize = optimize,
+            });
+            exe.root_module.addImport("aoc", aoc);
+            b.installArtifact(exe);
+        }
 
         const exe_unit_tests = b.addTest(.{
             .root_source_file = b.path(pf.path),

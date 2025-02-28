@@ -69,5 +69,3 @@ test "part2" {
 
     try std.testing.expectEqual(18805872, sum);
 }
-
-pub fn main() void {}

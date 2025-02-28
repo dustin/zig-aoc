@@ -31,5 +31,3 @@ test "part2" {
 
     try std.testing.expectEqual(12648139, computer.output.items[computer.output.items.len - 1]);
 }
-
-pub fn main() void {}
