@@ -75,8 +75,7 @@ pub const Computer = struct {
                 return .{ .Input = addr };
             },
             4 => {
-                const addr = this.at(this.pc + 1);
-                const val = this.at(addr);
+                const val = this.arg(0, modes[0], this.pc);
                 try this.output.append(val);
                 this.pc += 2;
                 return .Continue;
@@ -128,6 +127,7 @@ pub const Computer = struct {
         this.pc = 0;
         this.mem.deinit();
         this.mem = std.AutoHashMap(i32, i32).init(this.alloc);
+        this.output.clearRetainingCapacity();
     }
 
     pub fn run(this: *@This()) !ReturnMode {
