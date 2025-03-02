@@ -100,7 +100,7 @@ test "factorial" {
 pub fn Permutations(comptime T: type) type {
     return struct {
         i: usize,
-        initial_state: []const u8,
+        initial_state: []const T,
         /// must be at least as long as initial state.
         /// initial_state will be copied to this buffer each time next() is called.
         buf: []T,
@@ -111,7 +111,7 @@ pub fn Permutations(comptime T: type) type {
         }
 
         pub fn next(self: *Self) ?[]const T {
-            std.mem.copyForwards(u8, self.buf, self.initial_state);
+            std.mem.copyForwards(T, self.buf, self.initial_state);
             nthperm(self.buf, @as(u128, @intCast(self.i))) catch return null;
             self.i += 1;
             return self.buf;
