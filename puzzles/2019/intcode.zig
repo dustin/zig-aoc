@@ -4,37 +4,51 @@ const aoc = @import("aoc");
 pub const ReturnMode = union(enum) {
     Continue: void,
     Halted: void,
-    Input: i32,
+    Input: i64,
     Output: void, // return mode when pause-on-output is enabled
 };
 
 pub const AddrMode = enum {
     Position,
     Immediate,
+    Relative,
 };
 
-fn resolveOp(op: i32) AddrMode {
+fn resolveOp(op: i64) AddrMode {
     return switch (@mod(op, 10)) {
         0 => .Position,
         1 => .Immediate,
+        2 => .Relative,
         else => std.debug.panic("invalid addr mode: {d}\n", .{op}),
     };
 }
 
 pub const Computer = struct {
     alloc: std.mem.Allocator,
-    rom: []const i32,
-    mem: std.AutoHashMap(i32, i32),
-    output: std.ArrayList(i32),
+    rom: []const i64,
+    mem: std.AutoHashMap(i64, i64),
+    output: std.ArrayList(i64),
     pauseOnOutput: bool = false,
+    relBase: i64 = 0,
 
-    pc: i32 = 0,
+    pc: i64 = 0,
 
-    pub fn at(this: @This(), addr: i32) i32 {
-        return this.mem.get(addr) orelse this.rom[@intCast(addr)];
+    pub fn at(this: @This(), addr: i64) i64 {
+        // First check if the address is in the modified memory
+        if (this.mem.get(addr)) |val| {
+            return val;
+        }
+
+        // Then check if it's within the original program bounds
+        if (addr >= 0 and addr < this.rom.len) {
+            return this.rom[@intCast(addr)];
+        }
+
+        // Otherwise, return 0 (memory beyond program defaults to 0)
+        return 0;
     }
 
-    pub fn set(this: *@This(), addr: i32, val: i32) !void {
+    pub fn set(this: *@This(), addr: i64, val: i64) !void {
         try this.mem.put(addr, val);
     }
 
@@ -47,8 +61,8 @@ pub const Computer = struct {
     pub fn duplicate(this: *@This()) !*Computer {
         const mem = try this.mem.cloneWithAllocator(this.alloc);
         const output = try this.output.clone();
-        const rom = try this.alloc.alloc(i32, this.rom.len);
-        std.mem.copyForwards(i32, rom, this.rom);
+        const rom = try this.alloc.alloc(i64, this.rom.len);
+        std.mem.copyForwards(i64, rom, this.rom);
         var comp = try this.alloc.create(Computer);
         comp.alloc = this.alloc;
         comp.rom = rom;
@@ -56,14 +70,25 @@ pub const Computer = struct {
         comp.output = output;
         comp.pc = this.pc;
         comp.pauseOnOutput = this.pauseOnOutput;
+        comp.relBase = this.relBase;
         return comp;
     }
 
-    fn arg(this: @This(), argNum: u4, mode: AddrMode, addr: i32) i32 {
+    fn arg(this: @This(), argNum: u4, mode: AddrMode, addr: i64) i64 {
         const val = this.at(addr + argNum + 1);
         return switch (mode) {
             .Position => this.at(val),
             .Immediate => val,
+            .Relative => this.at(this.relBase + val),
+        };
+    }
+
+    fn writeArg(this: @This(), argNum: u4, mode: AddrMode, addr: i64) i64 {
+        const val = this.at(addr + argNum + 1);
+        return switch (mode) {
+            .Position => val,
+            .Immediate => std.debug.panic("Cannot use immediate mode for output parameters", .{}),
+            .Relative => this.relBase + val,
         };
     }
 
@@ -80,16 +105,16 @@ pub const Computer = struct {
             1, 2 => {
                 const a = this.arg(0, modes[0], this.pc);
                 const b = this.arg(1, modes[1], this.pc);
-                const c = this.at(this.pc + 3);
+                const outAddr = this.writeArg(2, modes[2], this.pc);
                 const rv = if (op == 1) a + b else a * b;
-                try this.set(c, rv);
+                try this.set(outAddr, rv);
                 this.pc += 4;
                 return .Continue;
             },
             3 => {
-                const addr = this.at(this.pc + 1);
+                const outAddr = this.writeArg(0, modes[0], this.pc);
                 this.pc += 2;
-                return .{ .Input = addr };
+                return .{ .Input = outAddr };
             },
             4 => {
                 const val = this.arg(0, modes[0], this.pc);
@@ -123,17 +148,23 @@ pub const Computer = struct {
             7 => {
                 const a = this.arg(0, modes[0], this.pc);
                 const b = this.arg(1, modes[1], this.pc);
-                const c = this.at(this.pc + 3);
-                try this.set(c, if (a < b) 1 else 0);
+                const outAddr = this.writeArg(2, modes[2], this.pc);
+                try this.set(outAddr, if (a < b) 1 else 0);
                 this.pc += 4;
                 return .Continue;
             },
             8 => {
                 const a = this.arg(0, modes[0], this.pc);
                 const b = this.arg(1, modes[1], this.pc);
-                const c = this.at(this.pc + 3);
-                try this.set(c, if (a == b) 1 else 0);
+                const outAddr = this.writeArg(2, modes[2], this.pc);
+                try this.set(outAddr, if (a == b) 1 else 0);
                 this.pc += 4;
+                return .Continue;
+            },
+            9 => {
+                const a = this.arg(0, modes[0], this.pc);
+                this.relBase += a;
+                this.pc += 2;
                 return .Continue;
             },
             99 => return .Halted,
@@ -146,7 +177,7 @@ pub const Computer = struct {
     pub fn reset(this: *@This()) void {
         this.pc = 0;
         this.mem.deinit();
-        this.mem = std.AutoHashMap(i32, i32).init(this.alloc);
+        this.mem = std.AutoHashMap(i64, i64).init(this.alloc);
         this.output.clearRetainingCapacity();
     }
 
@@ -160,14 +191,14 @@ pub const Computer = struct {
     }
 };
 
-pub fn newComputer(alloc: std.mem.Allocator, mem: []const i32) !Computer {
-    const rom = try alloc.alloc(i32, mem.len);
-    std.mem.copyForwards(i32, rom, mem);
+pub fn newComputer(alloc: std.mem.Allocator, mem: []const i64) !Computer {
+    const rom = try alloc.alloc(i64, mem.len);
+    std.mem.copyForwards(i64, rom, mem);
     return .{
         .alloc = alloc,
-        .mem = std.AutoHashMap(i32, i32).init(alloc),
+        .mem = std.AutoHashMap(i64, i64).init(alloc),
         .rom = rom,
-        .output = std.ArrayList(i32).init(alloc),
+        .output = std.ArrayList(i64).init(alloc),
     };
 }
 
@@ -176,7 +207,7 @@ pub fn readFile(alloc: std.mem.Allocator, path: []const u8) !Computer {
     defer file.close();
     var reader = file.reader();
 
-    var nums = std.ArrayList(i32).init(alloc);
+    var nums = std.ArrayList(i64).init(alloc);
     defer nums.deinit();
 
     while (true) {
@@ -185,7 +216,7 @@ pub fn readFile(alloc: std.mem.Allocator, path: []const u8) !Computer {
         if (token[token.len - 1] == '\n') {
             token = token[0 .. token.len - 1];
         }
-        const num = try aoc.input.parseInt(i32, token);
+        const num = try aoc.input.parseInt(i64, token);
         try nums.append(num);
     }
 
@@ -193,7 +224,7 @@ pub fn readFile(alloc: std.mem.Allocator, path: []const u8) !Computer {
 }
 
 test "computer memory" {
-    var c = try newComputer(std.testing.allocator, &[_]i32{ 1, 2, 3 });
+    var c = try newComputer(std.testing.allocator, &[_]i64{ 1, 2, 3 });
     defer c.deinit();
     try std.testing.expectEqual(1, c.at(0));
     try std.testing.expectEqual(2, c.at(1));
@@ -207,7 +238,7 @@ test "computer memory" {
 }
 
 test "single op" {
-    var c = try newComputer(std.testing.allocator, &[_]i32{ 1, 5, 6, 0, 99, 3, 7 });
+    var c = try newComputer(std.testing.allocator, &[_]i64{ 1, 5, 6, 0, 99, 3, 7 });
     defer c.deinit();
     var ran = try c.runOne();
     try std.testing.expectEqual(.Continue, ran);
@@ -220,19 +251,19 @@ test "single op" {
 }
 
 test "immediate op" {
-    var c = try newComputer(std.testing.allocator, &[_]i32{ 101, 5, 6, 0, 99, 3, 7 });
+    var c = try newComputer(std.testing.allocator, &[_]i64{ 101, 5, 6, 0, 99, 3, 7 });
     defer c.deinit();
     _ = try c.runOne();
     try std.testing.expectEqual(12, c.at(0));
 
-    var c2 = try newComputer(std.testing.allocator, &[_]i32{ 1001, 5, 6, 0, 99, 3, 7 });
+    var c2 = try newComputer(std.testing.allocator, &[_]i64{ 1001, 5, 6, 0, 99, 3, 7 });
     defer c2.deinit();
     _ = try c2.runOne();
     try std.testing.expectEqual(9, c2.at(0));
 }
 
 test "all ops" {
-    var c = try newComputer(std.testing.allocator, &[_]i32{ 1, 5, 6, 0, 99, 3, 7 });
+    var c = try newComputer(std.testing.allocator, &[_]i64{ 1, 5, 6, 0, 99, 3, 7 });
     defer c.deinit();
     const ran = try c.run();
     try std.testing.expectEqual(.Halted, ran);

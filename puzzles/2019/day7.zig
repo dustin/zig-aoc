@@ -6,13 +6,13 @@ test "part1" {
     var computer = try intcode.readFile(std.testing.allocator, "input/2019/day7");
     defer computer.deinit();
 
-    var sequence = [5]i32{ 0, 1, 2, 3, 4 };
+    var sequence = [5]i64{ 0, 1, 2, 3, 4 };
 
-    var buf: [5]i32 = undefined;
-    var it = aoc.permute.Permutations(i32).init(sequence[0..], &buf);
-    var mostOut: i32 = 0;
+    var buf: [5]i64 = undefined;
+    var it = aoc.permute.Permutations(i64).init(sequence[0..], &buf);
+    var mostOut: i64 = 0;
     while (it.next()) |phases| {
-        var out: i32 = 0;
+        var out: i64 = 0;
 
         for (phases) |phase| {
             computer.reset();
@@ -43,14 +43,14 @@ test "part2" {
     var computer = try intcode.readFile(std.testing.allocator, "input/2019/day7");
     defer computer.deinit();
 
-    var sequence = [5]i32{ 5, 6, 7, 8, 9 };
+    var sequence = [5]i64{ 5, 6, 7, 8, 9 };
 
-    var buf: [5]i32 = undefined;
-    var it = aoc.permute.Permutations(i32).init(sequence[0..], &buf);
-    var mostOut: i32 = 0;
+    var buf: [5]i64 = undefined;
+    var it = aoc.permute.Permutations(i64).init(sequence[0..], &buf);
+    var mostOut: i64 = 0;
     while (it.next()) |phases| {
-        var out: i32 = 0;
-        var bigout: i32 = 0;
+        var out: i64 = 0;
+        var bigout: i64 = 0;
 
         var computers: [5]*intcode.Computer = undefined;
 
