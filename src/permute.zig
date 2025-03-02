@@ -112,7 +112,7 @@ pub fn Permutations(comptime T: type) type {
 
         pub fn next(self: *Self) ?[]const T {
             std.mem.copyForwards(u8, self.buf, self.initial_state);
-            nthperm(self.buf, @as(u6, @intCast(self.i))) catch return null;
+            nthperm(self.buf, @as(u128, @intCast(self.i))) catch return null;
             self.i += 1;
             return self.buf;
         }
