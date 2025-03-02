@@ -5,6 +5,7 @@ pub const ReturnMode = union(enum) {
     Continue: void,
     Halted: void,
     Input: i32,
+    Output: void, // return mode when pause-on-output is enabled
 };
 
 pub const AddrMode = enum {
@@ -25,6 +26,7 @@ pub const Computer = struct {
     rom: []const i32,
     mem: std.AutoHashMap(i32, i32),
     output: std.ArrayList(i32),
+    pauseOnOutput: bool = false,
 
     pc: i32 = 0,
 
@@ -40,6 +42,21 @@ pub const Computer = struct {
         this.mem.deinit();
         this.alloc.free(this.rom);
         this.output.deinit();
+    }
+
+    pub fn duplicate(this: *@This()) !*Computer {
+        const mem = try this.mem.cloneWithAllocator(this.alloc);
+        const output = try this.output.clone();
+        const rom = try this.alloc.alloc(i32, this.rom.len);
+        std.mem.copyForwards(i32, rom, this.rom);
+        var comp = try this.alloc.create(Computer);
+        comp.alloc = this.alloc;
+        comp.rom = rom;
+        comp.mem = mem;
+        comp.output = output;
+        comp.pc = this.pc;
+        comp.pauseOnOutput = this.pauseOnOutput;
+        return comp;
     }
 
     fn arg(this: @This(), argNum: u4, mode: AddrMode, addr: i32) i32 {
@@ -78,6 +95,9 @@ pub const Computer = struct {
                 const val = this.arg(0, modes[0], this.pc);
                 try this.output.append(val);
                 this.pc += 2;
+                if (this.pauseOnOutput) {
+                    return .Output;
+                }
                 return .Continue;
             },
             5 => {
