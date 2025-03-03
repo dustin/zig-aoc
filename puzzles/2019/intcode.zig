@@ -181,6 +181,10 @@ pub const Computer = struct {
         this.output.clearRetainingCapacity();
     }
 
+    pub fn clearOutput(this: *@This()) void {
+        this.output.clearRetainingCapacity();
+    }
+
     pub fn run(this: *@This()) !ReturnMode {
         while (true) {
             const rv = try this.runOne();
