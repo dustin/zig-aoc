@@ -97,7 +97,7 @@ test "around a point diagonally" {
 }
 
 /// Directions in clockwise order starting from the top.
-const Dir = enum {
+pub const Dir = enum {
     n,
     e,
     s,
@@ -216,4 +216,23 @@ test "bounds checking" {
     b.addPoint(Point{ .x = -1, .y = -1 });
     try std.testing.expectEqual(2, b.maxX - b.minX);
     try std.testing.expectEqual(2, b.maxY - b.minY);
+}
+
+pub fn drawMap(comptime T: type, w: anytype, def: u8, f: fn (T) u8, map: anytype) !void {
+    var bounds = newBounds();
+    var iter = map.iterator();
+    while (iter.next()) |entry| {
+        bounds.addPoint(entry.key_ptr.*);
+    }
+
+    var y: i32 = bounds.minY;
+    while (y <= bounds.maxY) : (y += 1) {
+        var x: i32 = bounds.minX;
+        while (x <= bounds.maxX) : (x += 1) {
+            const p = Point{ .x = x, .y = y };
+            const c = if (map.get(p)) |v| f(v) else def;
+            try w.writeByte(c);
+        }
+        try w.writeByte('\n');
+    }
 }
