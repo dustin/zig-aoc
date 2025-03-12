@@ -13,7 +13,7 @@ fn run(alloc: std.mem.Allocator, firstColor: Color) !std.AutoHashMap(aoc.twod.Po
 
     var m = std.AutoHashMap(aoc.twod.Point, Color).init(alloc);
 
-    var position = aoc.twod.Point{ .x = 0, .y = 0 };
+    var position = aoc.twod.origin;
     var direction: aoc.twod.Dir = .n;
     try m.put(position, firstColor);
 

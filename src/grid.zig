@@ -11,14 +11,14 @@ pub const GridIterator = struct {
     point: twod.Point,
 
     pub fn next(this: *GridIterator) ?PointValue {
-        if (this.point.x == this.grid.bounds.maxX and this.point.y == this.grid.bounds.maxY) {
+        if (this.point.p[0] == this.grid.bounds.maxX and this.point.p[1] == this.grid.bounds.maxY) {
             return null;
         }
-        if (this.point.x == this.grid.bounds.maxX) {
-            this.point.x = 0;
-            this.point.y += 1;
+        if (this.point.p[0] == this.grid.bounds.maxX) {
+            this.point.p[0] = 0;
+            this.point.p[1] += 1;
         } else {
-            this.point.x += 1;
+            this.point.p[0] += 1;
         }
         if (this.grid.lookup(this.point)) |v| {
             return .{ .point = this.point, .value = v };
@@ -35,12 +35,12 @@ pub const Grid = struct {
         if (!this.bounds.contains(p)) {
             return null;
         }
-        const index = p.y * (this.bounds.maxX + 2) + p.x;
+        const index = p.y() * (this.bounds.maxX + 2) + p.x();
         return this.bytes[@intCast(index)];
     }
 
     pub fn iterate(this: @This()) GridIterator {
-        return .{ .grid = this, .point = .{ .x = -1, .y = 0 } };
+        return .{ .grid = this, .point = twod.newPoint(-1, 0) };
     }
 };
 
@@ -79,8 +79,8 @@ test parseGrid {
         .bytes = input,
     };
     try std.testing.expectEqual(expected, grid);
-    try std.testing.expectEqual('F', grid.lookup(.{ .x = 2, .y = 1 }).?);
-    try std.testing.expectEqual(null, grid.lookup(.{ .x = 3, .y = 1 }));
+    try std.testing.expectEqual('F', grid.lookup(twod.newPoint(2, 1)).?);
+    try std.testing.expectEqual(null, grid.lookup(twod.newPoint(3, 1)));
 
     const Item = struct { x: i32, y: i32, v: u8 };
 
@@ -89,7 +89,7 @@ test parseGrid {
     var it = grid.iterate();
     while (it.next()) |pv| {
         try std.testing.expectEqual(pv.value, grid.lookup(pv.point));
-        try al.append(Item{ .x = pv.point.x, .y = pv.point.y, .v = pv.value });
+        try al.append(Item{ .x = pv.point.x(), .y = pv.point.y(), .v = pv.value });
     }
     const exp = [_]Item{
         .{ .x = 0, .y = 0, .v = 'A' },
@@ -131,5 +131,5 @@ pub fn openFileGrid(alloc: std.mem.Allocator, path: []const u8) !FileGrid {
 test openFileGrid {
     var fg = try openFileGrid(std.testing.allocator, "input/2024/day4.ex");
     defer fg.deinit();
-    try std.testing.expectEqual('X', fg.grid.lookup(.{ .x = 4, .y = 1 }).?);
+    try std.testing.expectEqual('X', fg.grid.lookup(twod.newPoint(4, 1)).?);
 }

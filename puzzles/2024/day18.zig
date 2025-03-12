@@ -6,7 +6,7 @@ const Point = aoc.twod.Point;
 const A = struct {
     pointMap: std.AutoHashMap(aoc.twod.Point, void) = undefined,
     bounds: aoc.twod.Bounds = aoc.twod.Bounds{ .minX = 0, .minY = 0, .maxX = 70, .maxY = 70 },
-    dest: Point = Point{ .x = 70, .y = 70 },
+    dest: Point = aoc.twod.newPoint(70, 70),
 
     pub fn nf(this: *@This(), p: Point, neighbors: *std.ArrayList(aoc.search.Node(Point))) aoc.search.OutOfMemory!void {
         for (p.around()) |np| {
@@ -21,7 +21,7 @@ const A = struct {
     }
 
     pub fn found(this: *@This(), p: Point) aoc.search.OutOfMemory!bool {
-        return p.x == this.bounds.maxX and p.y == this.bounds.maxY;
+        return p.x() == this.bounds.maxX and p.y() == this.bounds.maxY;
     }
 
     pub fn deinit(this: *A) void {
@@ -34,10 +34,10 @@ const I = struct {
     lines: std.ArrayList(Point),
 
     pub fn parseLine(this: *@This(), line: []const u8) aoc.input.ParseError!bool {
-        var p = Point{ .x = 0, .y = 0 };
+        var p = aoc.twod.origin;
         var it = std.mem.splitSequence(u8, line, ",");
-        p.x = try aoc.input.parseInt(i32, it.next() orelse return false);
-        p.y = try aoc.input.parseInt(i32, it.next() orelse return false);
+        p.p[0] = try aoc.input.parseInt(i32, it.next() orelse return false);
+        p.p[1] = try aoc.input.parseInt(i32, it.next() orelse return false);
         try this.lines.append(p);
         return true;
     }
@@ -59,7 +59,7 @@ const I = struct {
         for (this.lines.items[0..maxLines]) |p| {
             a.pointMap.put(p, void{}) catch return error.ParseError;
         }
-        const start = Point{ .x = 0, .y = 0 };
+        const start = aoc.twod.origin;
 
         return aoc.search.astar(Point, Point, this.alloc, &a, start, A.rf, A.nf, A.found);
     }
@@ -106,6 +106,6 @@ test "part2" {
     try std.testing.expectEqual(2967, at);
 
     const p = st.lines.items[at - 1];
-    try std.testing.expectEqual(p.x, 16);
-    try std.testing.expectEqual(p.y, 44);
+    try std.testing.expectEqual(p.x(), 16);
+    try std.testing.expectEqual(p.y(), 44);
 }

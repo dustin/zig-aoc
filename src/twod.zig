@@ -1,31 +1,39 @@
 const std = @import("std");
 
 pub const Point = struct {
-    x: i32,
-    y: i32,
+    p: @Vector(2, i32),
+
+    pub fn x(this: @This()) i32 {
+        return this.p[0];
+    }
+
+    pub fn y(this: @This()) i32 {
+        return this.p[1];
+    }
 
     /// Manhattan distance between this point and that point.
     pub fn dist(this: @This(), that: Point) u32 {
-        return @abs(this.x - that.x) + @abs(this.y - that.y);
+        return @reduce(.Add, @abs(this.p - that.p));
     }
 
     /// Add this point to that point.
     pub fn add(this: @This(), p: Point) Point {
-        return Point{ .x = this.x + p.x, .y = this.y + p.y };
+        return .{ .p = this.p + p.p };
     }
 
     /// Multiply this point by a scalar (i.e. x*a, y*a).
     pub fn mult(this: @This(), a: i32) Point {
-        return Point{ .x = this.x * a, .y = this.y * a };
+        const av: @Vector(2, i32) = @splat(a);
+        return .{ .p = this.p * av };
     }
 
     /// The offset point in a given direction with the north reference.
     fn dirOff(_: @This(), north: i32, dir: Dir) Point {
         return switch (dir) {
-            .n => .{ .x = 0, .y = north },
-            .e => .{ .x = 1, .y = 0 },
-            .s => .{ .x = 0, .y = -north },
-            .w => .{ .x = -1, .y = 0 },
+            .n => newPoint(0, north),
+            .e => newPoint(1, 0),
+            .s => newPoint(0, -north),
+            .w => newPoint(-1, 0),
         };
     }
 
@@ -48,50 +56,51 @@ pub const Point = struct {
 
     pub fn around(p: @This()) [4]Point {
         return .{
-            .{ .x = p.x, .y = p.y - 1 },
-            .{ .x = p.x + 1, .y = p.y },
-            .{ .x = p.x, .y = p.y + 1 },
-            .{ .x = p.x - 1, .y = p.y },
+            .{ .p = p.p + newPoint(0, -1).p },
+            .{ .p = p.p + newPoint(1, 0).p },
+            .{ .p = p.p + newPoint(0, 1).p },
+            .{ .p = p.p + newPoint(-1, 0).p },
         };
     }
 
     /// Points surrounding the given point, including diagonals.
     pub fn aroundD(p: @This()) [8]Point {
         return .{
-            .{ .x = p.x - 1, .y = p.y - 1 },
-            .{ .x = p.x, .y = p.y - 1 },
-            .{ .x = p.x + 1, .y = p.y - 1 },
-            .{ .x = p.x + 1, .y = p.y },
-            .{ .x = p.x + 1, .y = p.y + 1 },
-            .{ .x = p.x, .y = p.y + 1 },
-            .{ .x = p.x - 1, .y = p.y + 1 },
-            .{ .x = p.x - 1, .y = p.y },
+            .{ .p = p.p + newPoint(-1, -1).p },
+            .{ .p = p.p + newPoint(0, -1).p },
+            .{ .p = p.p + newPoint(1, -1).p },
+            .{ .p = p.p + newPoint(1, 0).p },
+            .{ .p = p.p + newPoint(1, 1).p },
+            .{ .p = p.p + newPoint(0, 1).p },
+            .{ .p = p.p + newPoint(-1, 1).p },
+            .{ .p = p.p + newPoint(-1, 0).p },
         };
     }
 };
 
 test "around a point" {
-    const p = Point{ .x = 0, .y = 0 };
+    const p = origin;
     const expected = .{
-        Point{ .x = 0, .y = -1 },
-        Point{ .x = 1, .y = 0 },
-        Point{ .x = 0, .y = 1 },
-        Point{ .x = -1, .y = 0 },
+        newPoint(0, -1),
+        newPoint(1, 0),
+        newPoint(0, 1),
+        newPoint(-1, 0),
     };
     try std.testing.expectEqualDeep(expected, p.around());
 }
 
 test "around a point diagonally" {
-    const p = Point{ .x = 0, .y = 0 };
+    const p = origin;
+
     const expected = .{
-        Point{ .x = -1, .y = -1 },
-        Point{ .x = 0, .y = -1 },
-        Point{ .x = 1, .y = -1 },
-        Point{ .x = 1, .y = 0 },
-        Point{ .x = 1, .y = 1 },
-        Point{ .x = 0, .y = 1 },
-        Point{ .x = -1, .y = 1 },
-        Point{ .x = -1, .y = 0 },
+        newPoint(-1, -1),
+        newPoint(0, -1),
+        newPoint(1, -1),
+        newPoint(1, 0),
+        newPoint(1, 1),
+        newPoint(0, 1),
+        newPoint(-1, 1),
+        newPoint(-1, 0),
     };
     try std.testing.expectEqualDeep(expected, p.aroundD());
 }
@@ -122,6 +131,12 @@ pub const Dir = enum {
     }
 };
 
+pub fn newPoint(x: i32, y: i32) Point {
+    return Point{ .p = @Vector(2, i32){ x, y } };
+}
+
+pub const origin = newPoint(0, 0);
+
 test "directions" {
     const zigthesis = @import("zigthesis");
 
@@ -148,13 +163,13 @@ test "movement" {
         fn movement(d: Dir, p: Point, distance: u4) bool {
             const out = p.fwdBy(d, distance);
             const back = out.fwdBy(d.right().right(), distance);
-            return p.x == back.x and p.y == back.y;
+            return @reduce(.And, p.p == back.p);
         }
 
         fn invMovement(d: Dir, p: Point, distance: u4) bool {
             const out = p.invFwdBy(d, distance);
             const back = out.invFwdBy(d.right().right(), distance);
-            return p.x == back.x and p.y == back.y;
+            return @reduce(.And, p.p == back.p);
         }
 
         fn fwdByfwdEquiv(d: Dir, p: Point, distance: u4) bool {
@@ -189,14 +204,14 @@ pub const Bounds = struct {
     maxY: i32,
 
     pub fn addPoint(this: *@This(), p: Point) void {
-        if (p.x < this.minX) this.minX = p.x;
-        if (p.x > this.maxX) this.maxX = p.x;
-        if (p.y < this.minY) this.minY = p.y;
-        if (p.y > this.maxY) this.maxY = p.y;
+        if (p.x() < this.minX) this.minX = p.x();
+        if (p.x() > this.maxX) this.maxX = p.x();
+        if (p.y() < this.minY) this.minY = p.y();
+        if (p.y() > this.maxY) this.maxY = p.y();
     }
 
     pub fn contains(this: @This(), p: Point) bool {
-        return p.x >= this.minX and p.x <= this.maxX and p.y >= this.minY and p.y <= this.maxY;
+        return p.x() >= this.minX and p.x() <= this.maxX and p.y() >= this.minY and p.y() <= this.maxY;
     }
 };
 
@@ -211,9 +226,9 @@ pub fn newBounds() Bounds {
 
 test "bounds checking" {
     var b: Bounds = newBounds();
-    b.addPoint(Point{ .x = 0, .y = 0 });
-    b.addPoint(Point{ .x = 1, .y = 1 });
-    b.addPoint(Point{ .x = -1, .y = -1 });
+    b.addPoint(origin);
+    b.addPoint(newPoint(1, 1));
+    b.addPoint(newPoint(-1, -1));
     try std.testing.expectEqual(2, b.maxX - b.minX);
     try std.testing.expectEqual(2, b.maxY - b.minY);
 }
@@ -229,7 +244,7 @@ pub fn drawMap(comptime T: type, w: anytype, def: u8, f: fn (T) u8, map: anytype
     while (y <= bounds.maxY) : (y += 1) {
         var x: i32 = bounds.minX;
         while (x <= bounds.maxX) : (x += 1) {
-            const p = Point{ .x = x, .y = y };
+            const p = Point{.{ x, y }};
             const c = if (map.get(p)) |v| f(v) else def;
             try w.writeByte(c);
         }

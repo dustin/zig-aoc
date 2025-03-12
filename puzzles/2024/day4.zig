@@ -7,7 +7,7 @@ test "part1" {
     var fg = try aoc.grid.openFileGrid(std.testing.allocator, file_path);
     defer fg.deinit();
 
-    const dirs = (aoc.twod.Point{ .x = 0, .y = 0 }).aroundD();
+    const dirs = (aoc.twod.origin).aroundD();
     var christmases: u16 = 0;
 
     var it = fg.grid.iterate();
@@ -45,10 +45,10 @@ test "part2" {
         //  p
         // c d
 
-        const a = fg.grid.lookup(pv.point.add(.{ .x = -1, .y = -1 })) orelse continue;
-        const b = fg.grid.lookup(pv.point.add(.{ .x = 1, .y = -1 })) orelse continue;
-        const c = fg.grid.lookup(pv.point.add(.{ .x = -1, .y = 1 })) orelse continue;
-        const d = fg.grid.lookup(pv.point.add(.{ .x = 1, .y = 1 })) orelse continue;
+        const a = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(-1, -1))) orelse continue;
+        const b = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(1, -1))) orelse continue;
+        const c = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(-1, 1))) orelse continue;
+        const d = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(1, 1))) orelse continue;
 
         if (@min(a, d) == 'M' and @max(a, d) == 'S' and @min(b, c) == 'M' and @max(b, c) == 'S') {
             christmases += 1;
