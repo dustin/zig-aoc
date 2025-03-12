@@ -5,7 +5,7 @@ const Point = aoc.twod.Point;
 
 const A = struct {
     pointMap: std.AutoHashMap(aoc.twod.Point, void) = undefined,
-    bounds: aoc.twod.Bounds = aoc.twod.Bounds{ .minX = 0, .minY = 0, .maxX = 70, .maxY = 70 },
+    bounds: aoc.twod.Bounds = aoc.twod.Bounds{ .b = .{ .mins = @splat(0), .maxs = .{ 70, 70 } } },
     dest: Point = aoc.twod.newPoint(70, 70),
 
     pub fn nf(this: *@This(), p: Point, neighbors: *std.ArrayList(aoc.search.Node(Point))) aoc.search.OutOfMemory!void {
@@ -21,7 +21,7 @@ const A = struct {
     }
 
     pub fn found(this: *@This(), p: Point) aoc.search.OutOfMemory!bool {
-        return p.x() == this.bounds.maxX and p.y() == this.bounds.maxY;
+        return p.x() == this.bounds.maxX() and p.y() == this.bounds.maxY();
     }
 
     pub fn deinit(this: *A) void {

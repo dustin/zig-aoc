@@ -1,4 +1,5 @@
 const std = @import("std");
+const indy = @import("indy.zig");
 
 pub const Point = struct {
     p: @Vector(2, i32),
@@ -13,7 +14,7 @@ pub const Point = struct {
 
     /// Manhattan distance between this point and that point.
     pub fn dist(this: @This(), that: Point) u32 {
-        return @reduce(.Add, @abs(this.p - that.p));
+        return indy.mdist(this.p, that.p);
     }
 
     /// Add this point to that point.
@@ -55,12 +56,11 @@ pub const Point = struct {
     }
 
     pub fn around(p: @This()) [4]Point {
-        return .{
-            .{ .p = p.p + newPoint(0, -1).p },
-            .{ .p = p.p + newPoint(1, 0).p },
-            .{ .p = p.p + newPoint(0, 1).p },
-            .{ .p = p.p + newPoint(-1, 0).p },
-        };
+        var rv: [4]Point = undefined;
+        for (indy.around(p.p), 0..) |np, i| {
+            rv[i] = .{ .p = np };
+        }
+        return rv;
     }
 
     /// Points surrounding the given point, including diagonals.
@@ -77,17 +77,6 @@ pub const Point = struct {
         };
     }
 };
-
-test "around a point" {
-    const p = origin;
-    const expected = .{
-        newPoint(0, -1),
-        newPoint(1, 0),
-        newPoint(0, 1),
-        newPoint(-1, 0),
-    };
-    try std.testing.expectEqualDeep(expected, p.around());
-}
 
 test "around a point diagonally" {
     const p = origin;
@@ -198,30 +187,35 @@ test "movement" {
 }
 
 pub const Bounds = struct {
-    minX: i32,
-    minY: i32,
-    maxX: i32,
-    maxY: i32,
+    b: indy.Bounds(2),
+
+    pub fn minX(this: @This()) i32 {
+        return this.b.mins[0];
+    }
+
+    pub fn minY(this: @This()) i32 {
+        return this.b.mins[1];
+    }
+
+    pub fn maxX(this: @This()) i32 {
+        return this.b.maxs[0];
+    }
+
+    pub fn maxY(this: @This()) i32 {
+        return this.b.maxs[1];
+    }
 
     pub fn addPoint(this: *@This(), p: Point) void {
-        if (p.x() < this.minX) this.minX = p.x();
-        if (p.x() > this.maxX) this.maxX = p.x();
-        if (p.y() < this.minY) this.minY = p.y();
-        if (p.y() > this.maxY) this.maxY = p.y();
+        this.b.add(p.p);
     }
 
     pub fn contains(this: @This(), p: Point) bool {
-        return p.x() >= this.minX and p.x() <= this.maxX and p.y() >= this.minY and p.y() <= this.maxY;
+        return this.b.contains(p.p);
     }
 };
 
 pub fn newBounds() Bounds {
-    return Bounds{
-        .minX = std.math.maxInt(i32),
-        .minY = std.math.maxInt(i32),
-        .maxX = std.math.minInt(i32),
-        .maxY = std.math.minInt(i32),
-    };
+    return .{ .b = indy.newBounds(2) };
 }
 
 test "bounds checking" {
@@ -229,8 +223,8 @@ test "bounds checking" {
     b.addPoint(origin);
     b.addPoint(newPoint(1, 1));
     b.addPoint(newPoint(-1, -1));
-    try std.testing.expectEqual(2, b.maxX - b.minX);
-    try std.testing.expectEqual(2, b.maxY - b.minY);
+    try std.testing.expectEqual(2, b.maxX() - b.minX());
+    try std.testing.expectEqual(2, b.maxY() - b.minY());
 }
 
 pub fn drawMap(comptime T: type, w: anytype, def: u8, f: fn (T) u8, map: anytype) !void {
@@ -240,10 +234,10 @@ pub fn drawMap(comptime T: type, w: anytype, def: u8, f: fn (T) u8, map: anytype
         bounds.addPoint(entry.key_ptr.*);
     }
 
-    var y: i32 = bounds.minY;
-    while (y <= bounds.maxY) : (y += 1) {
-        var x: i32 = bounds.minX;
-        while (x <= bounds.maxX) : (x += 1) {
+    var y: i32 = bounds.minY();
+    while (y <= bounds.maxY()) : (y += 1) {
+        var x: i32 = bounds.minX();
+        while (x <= bounds.maxX()) : (x += 1) {
             const p = Point{.{ x, y }};
             const c = if (map.get(p)) |v| f(v) else def;
             try w.writeByte(c);

@@ -3,6 +3,7 @@ pub const twod = @import("twod.zig");
 pub const input = @import("input.zig");
 pub const grid = @import("grid.zig");
 pub const permute = @import("permute.zig");
+pub const indy = @import("indy.zig");
 
 const std = @import("std");
 
@@ -13,6 +14,7 @@ comptime {
         _ = input;
         _ = grid;
         _ = permute;
+        _ = indy;
     }
 }
 

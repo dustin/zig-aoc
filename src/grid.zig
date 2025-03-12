@@ -11,10 +11,10 @@ pub const GridIterator = struct {
     point: twod.Point,
 
     pub fn next(this: *GridIterator) ?PointValue {
-        if (this.point.p[0] == this.grid.bounds.maxX and this.point.p[1] == this.grid.bounds.maxY) {
+        if (this.point.p[0] == this.grid.bounds.maxX() and this.point.p[1] == this.grid.bounds.maxY()) {
             return null;
         }
-        if (this.point.p[0] == this.grid.bounds.maxX) {
+        if (this.point.p[0] == this.grid.bounds.maxX()) {
             this.point.p[0] = 0;
             this.point.p[1] += 1;
         } else {
@@ -35,7 +35,7 @@ pub const Grid = struct {
         if (!this.bounds.contains(p)) {
             return null;
         }
-        const index = p.y() * (this.bounds.maxX + 2) + p.x();
+        const index = p.y() * (this.bounds.maxX() + 2) + p.x();
         return this.bytes[@intCast(index)];
     }
 
@@ -48,16 +48,14 @@ pub const Grid = struct {
 pub fn parseGrid(input: []const u8) ?Grid {
     const nl = std.mem.indexOf(u8, input, "\n") orelse return null;
 
-    const g = Grid{ .bounds = twod.Bounds{
-        .minX = 0,
-        .minY = 0,
-        .maxX = @as(i32, @intCast(nl)) - 1,
-        .maxY = @intCast(input.len / (nl + 1) - 1),
-    }, .bytes = input };
+    const g = Grid{ .bounds = twod.Bounds{ .b = .{ .mins = @splat(0), .maxs = @Vector(2, i32){
+        @as(i32, @intCast(nl)) - 1,
+        @intCast(input.len / (nl + 1) - 1),
+    } } }, .bytes = input };
 
     // sanity check the grid newlines line up
-    for (@intCast(g.bounds.minY)..@intCast(g.bounds.maxY)) |y| {
-        const off: usize = @intCast(y * @as(usize, @intCast(g.bounds.maxX + 2)) + @as(usize, @intCast(g.bounds.maxX)) + 1);
+    for (@intCast(g.bounds.minY())..@intCast(g.bounds.maxY())) |y| {
+        const off: usize = @intCast(y * @as(usize, @intCast(g.bounds.maxX() + 2)) + @as(usize, @intCast(g.bounds.maxX())) + 1);
         if (input[off] != '\n') {
             return null;
         }
@@ -71,10 +69,7 @@ test parseGrid {
     const grid = parseGrid(input) orelse return error.ParseError;
     const expected = Grid{
         .bounds = twod.Bounds{
-            .minX = 0,
-            .minY = 0,
-            .maxX = 2,
-            .maxY = 2,
+            .b = .{ .mins = @splat(0), .maxs = @splat(2) },
         },
         .bytes = input,
     };
