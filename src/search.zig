@@ -30,8 +30,9 @@ pub fn flood(
 }
 
 test flood {
+    const P = @Vector(2, i32);
     const Points = struct {
-        pub fn neighbs(ctx: i32, point: [2]i32, neighbors: *std.ArrayList([2]i32)) OutOfMemory!void {
+        pub fn neighbs(ctx: i32, point: P, neighbors: *std.ArrayList(P)) OutOfMemory!void {
             if (point[0] < 10 and point[0] >= 0) {
                 if (point[0] + 1 == ctx) {
                     try neighbors.append(.{ point[0] + 2, point[1] });
@@ -46,9 +47,9 @@ test flood {
     };
 
     const allocator = std.testing.allocator;
-    var res = std.AutoHashMap([2]i32, void).init(allocator);
+    var res = std.AutoHashMap(P, void).init(allocator);
     defer res.deinit();
-    try flood([2]i32, allocator, @as(i32, 5), [2]i32{ 0, 0 }, Points.neighbs, &res);
+    try flood(P, allocator, @as(i32, 5), P{ 0, 0 }, Points.neighbs, &res);
     try std.testing.expectEqual(11, res.count());
 }
 
@@ -85,21 +86,23 @@ pub fn bfs(
 }
 
 test bfs {
+    const P = @Vector(2, i32);
+
     const T = struct {
-        latest: ?[2]i32 = null,
+        latest: ?P = null,
         target: i32 = 0,
 
-        pub fn neighbs(_: *@This(), point: [2]i32, neighbors: *std.ArrayList([2]i32)) OutOfMemory!void {
+        pub fn neighbs(_: *@This(), point: P, neighbors: *std.ArrayList(P)) OutOfMemory!void {
             if (point[0] < 10 and point[0] >= 0) {
                 try neighbors.append(.{ point[0] + 1, point[1] + 1 });
             }
         }
 
-        pub fn rf(_: *@This(), p: [2]i32) i32 {
+        pub fn rf(_: *@This(), p: P) i32 {
             return p[0];
         }
 
-        pub fn found(ctx: *@This(), point: [2]i32) OutOfMemory!bool {
+        pub fn found(ctx: *@This(), point: P) OutOfMemory!bool {
             ctx.latest = point;
             return point[0] == ctx.target;
         }
@@ -107,8 +110,8 @@ test bfs {
 
     const allocator = std.testing.allocator;
     var tee = T{ .target = 5 };
-    try bfs([2]i32, i32, allocator, &tee, [2]i32{ 0, 0 }, T.rf, T.neighbs, T.found);
-    try std.testing.expectEqual([2]i32{ 5, 5 }, tee.latest.?);
+    try bfs(P, i32, allocator, &tee, P{ 0, 0 }, T.rf, T.neighbs, T.found);
+    try std.testing.expectEqual(P{ 5, 5 }, tee.latest.?);
 }
 
 pub fn Node(comptime T: type) type {
@@ -213,7 +216,7 @@ pub fn astar(
 }
 
 test astar {
-    const NT = [2]i32;
+    const NT = @Vector(2, i32);
     const T = struct {
         target: i32 = 0,
 
@@ -223,26 +226,26 @@ test astar {
             try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] + 1 } });
             try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] - 1 } });
         }
-        pub fn rf(_: *@This(), p: [2]i32) [2]i32 {
+        pub fn rf(_: *@This(), p: NT) NT {
             return p;
         }
 
-        pub fn found(ctx: *@This(), point: [2]i32) OutOfMemory!bool {
+        pub fn found(ctx: *@This(), point: NT) OutOfMemory!bool {
             return point[0] == ctx.target;
         }
     };
 
     const allocator = std.testing.allocator;
     var tee = T{ .target = 5 };
-    var res = try astar([2]i32, [2]i32, allocator, &tee, [2]i32{ 0, 0 }, T.rf, T.nf, T.found);
+    var res = try astar(NT, NT, allocator, &tee, NT{ 0, 0 }, T.rf, T.nf, T.found);
     defer res.deinit();
 
     try std.testing.expectEqual(5, res.cost);
-    if (try res.resolve(allocator, [2]i32{ 0, 0 }, [2]i32{ 5, 5 })) |p| {
+    if (try res.resolve(allocator, NT{ 0, 0 }, NT{ 5, 5 })) |p| {
         defer allocator.free(p.@"1");
         try std.testing.expectEqual(p.@"0", 5);
-        var exp = [_][2]i32{ .{ 0, 0 }, .{ 1, 1 }, .{ 2, 2 }, .{ 3, 3 }, .{ 4, 4 }, .{ 5, 5 } };
-        try std.testing.expectEqualSlices([2]i32, &exp, p.@"1");
+        var exp = [_]NT{ .{ 0, 0 }, .{ 1, 1 }, .{ 2, 2 }, .{ 3, 3 }, .{ 4, 4 }, .{ 5, 5 } };
+        try std.testing.expectEqualSlices(NT, &exp, p.@"1");
     }
 }
 
