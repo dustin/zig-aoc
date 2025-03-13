@@ -122,58 +122,17 @@ test "movement" {
     try zigthesis.falsifyWith(T.invFwdByfwdEquiv, "n invFwd == invFwdBy n", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
 }
 
-pub const Bounds = struct {
-    b: indy.Bounds(2),
-
-    pub fn minX(this: @This()) i32 {
-        return this.b.mins[0];
-    }
-
-    pub fn minY(this: @This()) i32 {
-        return this.b.mins[1];
-    }
-
-    pub fn maxX(this: @This()) i32 {
-        return this.b.maxs[0];
-    }
-
-    pub fn maxY(this: @This()) i32 {
-        return this.b.maxs[1];
-    }
-
-    pub fn addPoint(this: *@This(), p: Point) void {
-        this.b.add(p);
-    }
-
-    pub fn contains(this: @This(), p: Point) bool {
-        return this.b.contains(p);
-    }
-};
-
-pub fn newBounds() Bounds {
-    return .{ .b = indy.newBounds(2) };
-}
-
-test "bounds checking" {
-    var b: Bounds = newBounds();
-    b.addPoint(origin);
-    b.addPoint(.{ 1, 1 });
-    b.addPoint(.{ -1, -1 });
-    try std.testing.expectEqual(2, b.maxX() - b.minX());
-    try std.testing.expectEqual(2, b.maxY() - b.minY());
-}
-
 pub fn drawMap(comptime T: type, w: anytype, def: u8, f: fn (T) u8, map: anytype) !void {
-    var bounds = newBounds();
+    var bounds = indy.newBounds();
     var iter = map.iterator();
     while (iter.next()) |entry| {
         bounds.addPoint(entry.key_ptr.*);
     }
 
-    var y: i32 = bounds.minY();
-    while (y <= bounds.maxY()) : (y += 1) {
-        var x: i32 = bounds.minX();
-        while (x <= bounds.maxX()) : (x += 1) {
+    var y: i32 = bounds.mins[1];
+    while (y <= bounds.maxs[1]) : (y += 1) {
+        var x: i32 = bounds.mins[0];
+        while (x <= bounds.maxs[0]) : (x += 1) {
             const p = Point{.{ x, y }};
             const c = if (map.get(p)) |v| f(v) else def;
             try w.writeByte(c);

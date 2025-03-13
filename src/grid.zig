@@ -1,5 +1,6 @@
 const std = @import("std");
 const twod = @import("twod.zig");
+const indy = @import("indy.zig");
 
 pub const PointValue = struct {
     point: twod.Point,
@@ -11,10 +12,10 @@ pub const GridIterator = struct {
     point: twod.Point,
 
     pub fn next(this: *GridIterator) ?PointValue {
-        if (this.point[0] == this.grid.bounds.maxX() and this.point[1] == this.grid.bounds.maxY()) {
+        if (this.point[0] == this.grid.bounds.maxs[0] and this.point[1] == this.grid.bounds.maxs[1]) {
             return null;
         }
-        if (this.point[0] == this.grid.bounds.maxX()) {
+        if (this.point[0] == this.grid.bounds.maxs[0]) {
             this.point[0] = 0;
             this.point[1] += 1;
         } else {
@@ -28,14 +29,14 @@ pub const GridIterator = struct {
 };
 
 pub const Grid = struct {
-    bounds: twod.Bounds,
+    bounds: indy.Bounds(2),
     bytes: []const u8,
 
     pub fn lookup(this: Grid, p: twod.Point) ?u8 {
         if (!this.bounds.contains(p)) {
             return null;
         }
-        const index = p[1] * (this.bounds.maxX() + 2) + p[0];
+        const index = p[1] * (this.bounds.maxs[0] + 2) + p[0];
         return this.bytes[@intCast(index)];
     }
 
@@ -48,14 +49,14 @@ pub const Grid = struct {
 pub fn parseGrid(input: []const u8) ?Grid {
     const nl = std.mem.indexOf(u8, input, "\n") orelse return null;
 
-    const g = Grid{ .bounds = twod.Bounds{ .b = .{ .mins = @splat(0), .maxs = @Vector(2, i32){
+    const g = Grid{ .bounds = .{ .mins = @splat(0), .maxs = @Vector(2, i32){
         @as(i32, @intCast(nl)) - 1,
         @intCast(input.len / (nl + 1) - 1),
-    } } }, .bytes = input };
+    } }, .bytes = input };
 
     // sanity check the grid newlines line up
-    for (@intCast(g.bounds.minY())..@intCast(g.bounds.maxY())) |y| {
-        const off: usize = @intCast(y * @as(usize, @intCast(g.bounds.maxX() + 2)) + @as(usize, @intCast(g.bounds.maxX())) + 1);
+    for (@intCast(g.bounds.mins[1])..@intCast(g.bounds.maxs[1])) |y| {
+        const off: usize = @intCast(y * @as(usize, @intCast(g.bounds.maxs[0] + 2)) + @as(usize, @intCast(g.bounds.maxs[0])) + 1);
         if (input[off] != '\n') {
             return null;
         }
@@ -68,9 +69,8 @@ test parseGrid {
     const input = "ABC\nDEF\nGHI\n";
     const grid = parseGrid(input) orelse return error.ParseError;
     const expected = Grid{
-        .bounds = twod.Bounds{
-            .b = .{ .mins = @splat(0), .maxs = @splat(2) },
-        },
+        .bounds = .{ .mins = @splat(0), .maxs = @splat(2) },
+
         .bytes = input,
     };
     try std.testing.expectEqual(expected, grid);
