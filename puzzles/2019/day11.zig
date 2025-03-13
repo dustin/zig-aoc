@@ -27,7 +27,7 @@ fn run(alloc: std.mem.Allocator, firstColor: Color) !std.AutoHashMap(aoc.twod.Po
                 if (outs.len == 2) {
                     try m.put(position, if (outs[0] == 0) .Black else .White);
                     direction = if (outs[1] == 0) direction.left() else direction.right();
-                    position = position.invFwd(direction);
+                    position = aoc.twod.invFwd(position, direction);
                 } else if (outs.len == 0) {
                     // first case does nothing
                 } else {

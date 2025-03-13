@@ -1,92 +1,37 @@
 const std = @import("std");
 const indy = @import("indy.zig");
 
-pub const Point = struct {
-    p: @Vector(2, i32),
+/// A 2D point is just a two element vector.
+pub const Point = @Vector(2, i32);
 
-    pub fn x(this: @This()) i32 {
-        return this.p[0];
-    }
-
-    pub fn y(this: @This()) i32 {
-        return this.p[1];
-    }
-
-    /// Manhattan distance between this point and that point.
-    pub fn dist(this: @This(), that: Point) u32 {
-        return indy.mdist(this.p, that.p);
-    }
-
-    /// Add this point to that point.
-    pub fn add(this: @This(), p: Point) Point {
-        return .{ .p = this.p + p.p };
-    }
-
-    /// Multiply this point by a scalar (i.e. x*a, y*a).
-    pub fn mult(this: @This(), a: i32) Point {
-        const av: @Vector(2, i32) = @splat(a);
-        return .{ .p = this.p * av };
-    }
-
-    /// The offset point in a given direction with the north reference.
-    fn dirOff(_: @This(), north: i32, dir: Dir) Point {
-        return switch (dir) {
-            .n => newPoint(0, north),
-            .e => newPoint(1, 0),
-            .s => newPoint(0, -north),
-            .w => newPoint(-1, 0),
-        };
-    }
-
-    pub fn fwdBy(this: @This(), dir: Dir, a: i32) Point {
-        return this.add(this.dirOff(1, dir).mult(a));
-    }
-
-    pub fn fwd(this: @This(), dir: Dir) Point {
-        return this.fwdBy(dir, 1);
-    }
-
-    /// Forward with north and south reversed.
-    pub fn invFwdBy(this: @This(), dir: Dir, a: i32) Point {
-        return this.add(this.dirOff(-1, dir).mult(a));
-    }
-
-    pub fn invFwd(this: @This(), dir: Dir) Point {
-        return this.invFwdBy(dir, 1);
-    }
-
-    pub fn around(p: @This()) [4]Point {
-        var rv: [4]Point = undefined;
-        for (indy.around(p.p), 0..) |np, i| {
-            rv[i] = .{ .p = np };
-        }
-        return rv;
-    }
-
-    /// Points surrounding the given point, including diagonals.
-    pub fn aroundD(p: @This()) [8]Point {
-        var ret: [8]Point = @splat(p);
-        for (indy.aroundD(p.p), 0..) |np, i| {
-            ret[i] = .{ .p = np };
-        }
-        return ret;
-    }
-};
-
-test "around a point diagonally" {
-    const p = origin;
-
-    const expected = .{
-        newPoint(-1, -1),
-        newPoint(0, -1),
-        newPoint(1, -1),
-        newPoint(-1, 0),
-        newPoint(1, 0),
-        newPoint(-1, 1),
-        newPoint(0, 1),
-        newPoint(1, 1),
+/// The offset point in a given direction with the north reference.
+fn dirOff(north: i32, dir: Dir) Point {
+    return switch (dir) {
+        .n => .{ 0, north },
+        .e => .{ 1, 0 },
+        .s => .{ 0, -north },
+        .w => .{ -1, 0 },
     };
-    try std.testing.expectEqualDeep(expected, p.aroundD());
+}
+
+/// Move a point forward in the given direction by the given amount.
+pub fn fwdBy(p: Point, dir: Dir, a: i32) Point {
+    return p + (dirOff(1, dir) * @as(Point, @splat(a)));
+}
+
+/// Move a point forward in the given direction by one unit.
+pub fn fwd(p: Point, dir: Dir) Point {
+    return fwdBy(p, dir, 1);
+}
+
+/// Forward with north and south reversed.
+pub fn invFwdBy(p: Point, dir: Dir, a: i32) Point {
+    return p + (dirOff(-1, dir) * @as(Point, @splat(a)));
+}
+
+/// Forward by one unit with north and south reversed.
+pub fn invFwd(p: Point, dir: Dir) Point {
+    return invFwdBy(p, dir, 1);
 }
 
 /// Directions in clockwise order starting from the top.
@@ -115,11 +60,7 @@ pub const Dir = enum {
     }
 };
 
-pub fn newPoint(x: i32, y: i32) Point {
-    return Point{ .p = @Vector(2, i32){ x, y } };
-}
-
-pub const origin = newPoint(0, 0);
+pub const origin: Point = @splat(0);
 
 test "directions" {
     const zigthesis = @import("zigthesis");
@@ -145,33 +86,33 @@ test "movement" {
 
     const T = struct {
         fn movement(d: Dir, p: Point, distance: u4) bool {
-            const out = p.fwdBy(d, distance);
-            const back = out.fwdBy(d.right().right(), distance);
-            return @reduce(.And, p.p == back.p);
+            const out = fwdBy(p, d, distance);
+            const back = fwdBy(out, d.right().right(), distance);
+            return @reduce(.And, p == back);
         }
 
         fn invMovement(d: Dir, p: Point, distance: u4) bool {
-            const out = p.invFwdBy(d, distance);
-            const back = out.invFwdBy(d.right().right(), distance);
-            return @reduce(.And, p.p == back.p);
+            const out = invFwdBy(p, d, distance);
+            const back = invFwdBy(out, d.right().right(), distance);
+            return @reduce(.And, p == back);
         }
 
         fn fwdByfwdEquiv(d: Dir, p: Point, distance: u4) bool {
-            const out = p.fwdBy(d, distance);
+            const out = fwdBy(p, d, distance);
             var snd = p;
             for (0..distance) |_| {
-                snd = snd.fwd(d);
+                snd = fwd(snd, d);
             }
-            return out.dist(snd) == 0;
+            return indy.mdist(out, snd) == 0;
         }
 
         fn invFwdByfwdEquiv(d: Dir, p: Point, distance: u4) bool {
-            const out = p.invFwdBy(d, distance);
+            const out = invFwdBy(p, d, distance);
             var snd = p;
             for (0..distance) |_| {
-                snd = snd.invFwd(d);
+                snd = invFwd(snd, d);
             }
-            return out.dist(snd) == 0;
+            return indy.mdist(out, snd) == 0;
         }
     };
 
@@ -201,11 +142,11 @@ pub const Bounds = struct {
     }
 
     pub fn addPoint(this: *@This(), p: Point) void {
-        this.b.add(p.p);
+        this.b.add(p);
     }
 
     pub fn contains(this: @This(), p: Point) bool {
-        return this.b.contains(p.p);
+        return this.b.contains(p);
     }
 };
 
@@ -216,8 +157,8 @@ pub fn newBounds() Bounds {
 test "bounds checking" {
     var b: Bounds = newBounds();
     b.addPoint(origin);
-    b.addPoint(newPoint(1, 1));
-    b.addPoint(newPoint(-1, -1));
+    b.addPoint(.{ 1, 1 });
+    b.addPoint(.{ -1, -1 });
     try std.testing.expectEqual(2, b.maxX() - b.minX());
     try std.testing.expectEqual(2, b.maxY() - b.minY());
 }

@@ -6,12 +6,12 @@ const Point = aoc.twod.Point;
 const A = struct {
     pointMap: std.AutoHashMap(aoc.twod.Point, void) = undefined,
     bounds: aoc.twod.Bounds = aoc.twod.Bounds{ .b = .{ .mins = @splat(0), .maxs = .{ 70, 70 } } },
-    dest: Point = aoc.twod.newPoint(70, 70),
+    dest: Point = .{ 70, 70 },
 
     pub fn nf(this: *@This(), p: Point, neighbors: *std.ArrayList(aoc.search.Node(Point))) aoc.search.OutOfMemory!void {
-        for (p.around()) |np| {
+        for (aoc.indy.around(p)) |np| {
             if (this.bounds.contains(np) and this.pointMap.get(np) == null) {
-                try neighbors.append(.{ .cost = 1, .heuristic = @intCast(this.dest.dist(np)), .val = np });
+                try neighbors.append(.{ .cost = 1, .heuristic = @intCast(aoc.indy.mdist(this.dest, np)), .val = np });
             }
         }
     }
@@ -21,7 +21,7 @@ const A = struct {
     }
 
     pub fn found(this: *@This(), p: Point) aoc.search.OutOfMemory!bool {
-        return p.x() == this.bounds.maxX() and p.y() == this.bounds.maxY();
+        return p[0] == this.bounds.maxX() and p[1] == this.bounds.maxY();
     }
 
     pub fn deinit(this: *A) void {
@@ -36,8 +36,8 @@ const I = struct {
     pub fn parseLine(this: *@This(), line: []const u8) aoc.input.ParseError!bool {
         var p = aoc.twod.origin;
         var it = std.mem.splitSequence(u8, line, ",");
-        p.p[0] = try aoc.input.parseInt(i32, it.next() orelse return false);
-        p.p[1] = try aoc.input.parseInt(i32, it.next() orelse return false);
+        p[0] = try aoc.input.parseInt(i32, it.next() orelse return false);
+        p[1] = try aoc.input.parseInt(i32, it.next() orelse return false);
         try this.lines.append(p);
         return true;
     }
@@ -106,6 +106,5 @@ test "part2" {
     try std.testing.expectEqual(2967, at);
 
     const p = st.lines.items[at - 1];
-    try std.testing.expectEqual(p.x(), 16);
-    try std.testing.expectEqual(p.y(), 44);
+    try std.testing.expectEqual(.{ 16, 44 }, p);
 }

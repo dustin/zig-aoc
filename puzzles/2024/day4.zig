@@ -7,7 +7,7 @@ test "part1" {
     var fg = try aoc.grid.openFileGrid(std.testing.allocator, file_path);
     defer fg.deinit();
 
-    const dirs = (aoc.twod.origin).aroundD();
+    const dirs = aoc.indy.aroundD(aoc.twod.origin);
     var christmases: u16 = 0;
 
     var it = fg.grid.iterate();
@@ -17,9 +17,9 @@ test "part1" {
         }
 
         for (dirs) |dir| {
-            const m = fg.grid.lookup(pv.point.add(dir)) orelse continue;
-            const a = fg.grid.lookup(pv.point.add(dir.mult(2))) orelse continue;
-            const s = fg.grid.lookup(pv.point.add(dir.mult(3))) orelse continue;
+            const m = fg.grid.lookup(pv.point + dir) orelse continue;
+            const a = fg.grid.lookup(pv.point + (dir * @as(aoc.twod.Point, @splat(2)))) orelse continue;
+            const s = fg.grid.lookup(pv.point + (dir * @as(aoc.twod.Point, @splat(3)))) orelse continue;
             if (m == 'M' and a == 'A' and s == 'S') {
                 christmases += 1;
             }
@@ -45,10 +45,10 @@ test "part2" {
         //  p
         // c d
 
-        const a = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(-1, -1))) orelse continue;
-        const b = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(1, -1))) orelse continue;
-        const c = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(-1, 1))) orelse continue;
-        const d = fg.grid.lookup(pv.point.add(aoc.twod.newPoint(1, 1))) orelse continue;
+        const a = fg.grid.lookup(pv.point + aoc.twod.Point{ -1, -1 }) orelse continue;
+        const b = fg.grid.lookup(pv.point + aoc.twod.Point{ 1, -1 }) orelse continue;
+        const c = fg.grid.lookup(pv.point + aoc.twod.Point{ -1, 1 }) orelse continue;
+        const d = fg.grid.lookup(pv.point + aoc.twod.Point{ 1, 1 }) orelse continue;
 
         if (@min(a, d) == 'M' and @max(a, d) == 'S' and @min(b, c) == 'M' and @max(b, c) == 'S') {
             christmases += 1;
