@@ -23,7 +23,7 @@ pub fn around(p: anytype) [2 * @typeInfo(@TypeOf(p)).vector.len](@TypeOf(p)) {
     var result: [2 * @typeInfo(P).vector.len]P = @splat(p);
     var index: usize = 0;
 
-    inline for (0..dimensions) |d| {
+    for (0..dimensions) |d| {
         result[index][d] = p[d] - 1;
         index += 1;
         result[index][d] = p[d] + 1;
@@ -54,6 +54,53 @@ test "around a point" {
         .{ 0, 0, 1 },
     };
     try std.testing.expectEqualDeep(expected3d, around(p3d));
+}
+
+/// Return all neighbors including diagonals.
+pub fn aroundD(p: anytype) [std.math.pow(usize, 3, @typeInfo(@TypeOf(p)).vector.len) - 1](@TypeOf(p)) {
+    const P = @TypeOf(p);
+    const dimensions = @typeInfo(P).vector.len;
+    var result: [std.math.pow(usize, 3, dimensions) - 1]P = @splat(p);
+    var count: usize = 0;
+
+    var offsets: @Vector(dimensions, i32) = @splat(-1);
+    const zero: @Vector(dimensions, i32) = @splat(0);
+
+    while (count < result.len) {
+        // Add this point if it's not the original
+        if (!@reduce(.And, offsets == zero)) {
+            result[count] += offsets;
+            count += 1;
+        }
+
+        // Generate next combination (like counting in base 3)
+        for (0..dimensions) |i| {
+            offsets[i] += 1;
+            if (offsets[i] > 1) {
+                offsets[i] = -1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
+test aroundD {
+    const p2 = @Vector(2, i32){ 0, 0 };
+    const got = aroundD(p2);
+    const expected2: [8]@Vector(2, i32) = .{
+        .{ -1, -1 },
+        .{ 0, -1 },
+        .{ 1, -1 },
+        .{ -1, 0 },
+        .{ 1, 0 },
+        .{ -1, 1 },
+        .{ 0, 1 },
+        .{ 1, 1 },
+    };
+    try std.testing.expectEqualDeep(expected2, got);
 }
 
 /// Bounds for arbitrary dimenional space.

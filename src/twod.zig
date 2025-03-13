@@ -65,16 +65,11 @@ pub const Point = struct {
 
     /// Points surrounding the given point, including diagonals.
     pub fn aroundD(p: @This()) [8]Point {
-        return .{
-            .{ .p = p.p + newPoint(-1, -1).p },
-            .{ .p = p.p + newPoint(0, -1).p },
-            .{ .p = p.p + newPoint(1, -1).p },
-            .{ .p = p.p + newPoint(1, 0).p },
-            .{ .p = p.p + newPoint(1, 1).p },
-            .{ .p = p.p + newPoint(0, 1).p },
-            .{ .p = p.p + newPoint(-1, 1).p },
-            .{ .p = p.p + newPoint(-1, 0).p },
-        };
+        var ret: [8]Point = @splat(p);
+        for (indy.aroundD(p.p), 0..) |np, i| {
+            ret[i] = .{ .p = np };
+        }
+        return ret;
     }
 };
 
@@ -85,11 +80,11 @@ test "around a point diagonally" {
         newPoint(-1, -1),
         newPoint(0, -1),
         newPoint(1, -1),
-        newPoint(1, 0),
-        newPoint(1, 1),
-        newPoint(0, 1),
-        newPoint(-1, 1),
         newPoint(-1, 0),
+        newPoint(1, 0),
+        newPoint(-1, 1),
+        newPoint(0, 1),
+        newPoint(1, 1),
     };
     try std.testing.expectEqualDeep(expected, p.aroundD());
 }
