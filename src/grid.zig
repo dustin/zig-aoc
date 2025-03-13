@@ -12,7 +12,7 @@ pub const GridIterator = struct {
     point: twod.Point,
 
     pub fn next(this: *GridIterator) ?PointValue {
-        if (this.point[0] == this.grid.bounds.maxs[0] and this.point[1] == this.grid.bounds.maxs[1]) {
+        if (@reduce(.And, this.point == this.grid.bounds.maxs)) {
             return null;
         }
         if (this.point[0] == this.grid.bounds.maxs[0]) {

@@ -21,7 +21,7 @@ const A = struct {
     }
 
     pub fn found(this: *@This(), p: Point) aoc.search.OutOfMemory!bool {
-        return p[0] == this.bounds.maxs[0] and p[1] == this.bounds.maxs[1];
+        return @reduce(.And, p == this.bounds.maxs);
     }
 
     pub fn deinit(this: *A) void {
