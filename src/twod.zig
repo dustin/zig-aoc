@@ -123,17 +123,17 @@ test "movement" {
 }
 
 pub fn drawMap(comptime T: type, w: anytype, def: u8, f: fn (T) u8, map: anytype) !void {
-    var bounds = indy.newBounds();
+    var bounds = indy.newBounds(2);
     var iter = map.iterator();
     while (iter.next()) |entry| {
-        bounds.addPoint(entry.key_ptr.*);
+        bounds.add(entry.key_ptr.*);
     }
 
     var y: i32 = bounds.mins[1];
     while (y <= bounds.maxs[1]) : (y += 1) {
         var x: i32 = bounds.mins[0];
         while (x <= bounds.maxs[0]) : (x += 1) {
-            const p = Point{.{ x, y }};
+            const p = .{ x, y };
             const c = if (map.get(p)) |v| f(v) else def;
             try w.writeByte(c);
         }
