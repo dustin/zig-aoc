@@ -15,22 +15,22 @@ fn dirOff(north: i32, dir: Dir) Point {
 }
 
 /// Move a point forward in the given direction by the given amount.
-pub fn fwdBy(p: Point, dir: Dir, a: i32) Point {
+pub inline fn fwdBy(p: Point, dir: Dir, a: i32) Point {
     return p + (dirOff(1, dir) * @as(Point, @splat(a)));
 }
 
 /// Move a point forward in the given direction by one unit.
-pub fn fwd(p: Point, dir: Dir) Point {
+pub inline fn fwd(p: Point, dir: Dir) Point {
     return fwdBy(p, dir, 1);
 }
 
 /// Forward with north and south reversed.
-pub fn invFwdBy(p: Point, dir: Dir, a: i32) Point {
+pub inline fn invFwdBy(p: Point, dir: Dir, a: i32) Point {
     return p + (dirOff(-1, dir) * @as(Point, @splat(a)));
 }
 
 /// Forward by one unit with north and south reversed.
-pub fn invFwd(p: Point, dir: Dir) Point {
+pub inline fn invFwd(p: Point, dir: Dir) Point {
     return invFwdBy(p, dir, 1);
 }
 

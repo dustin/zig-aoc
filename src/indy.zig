@@ -1,7 +1,7 @@
 const std = @import("std");
 
 /// Compute the Manhattan distance between two points in arbitrary dimensional space.
-pub fn mdist(a: anytype, b: @TypeOf(a)) u32 {
+pub inline fn mdist(a: anytype, b: @TypeOf(a)) u32 {
     return @reduce(.Add, @abs(a - b));
 }
 
