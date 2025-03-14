@@ -337,3 +337,27 @@ test "auto binary search" {
 
     try zigthesis.falsifyWith(T.autoSortProp, "auto sorts sort", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
 }
+
+// This actually blows all kinds of up on edge cases with numbers that are too large or too small.
+test "fuzz auto bin" {
+    const T = struct {
+        val: i32 = 0,
+
+        pub fn compare(this: @This(), val: i32) std.math.Order {
+            return std.math.order(val, this.val);
+        }
+
+        pub fn autoSortProp(_: i32, in: []const u8) anyerror!void {
+            if (in.len < 4) {
+                return {};
+            }
+
+            const ptr: *const [4]u8 = @ptrCast(in.ptr);
+            const val = std.mem.readInt(i32, ptr, .little);
+            const i = @This(){ .val = val };
+            try std.testing.expectEqual(val, autoBinSearch(i32, i, @This().compare));
+        }
+    };
+
+    try std.testing.fuzz(@as(i32, 0), T.autoSortProp, .{});
+}
