@@ -179,6 +179,7 @@ pub const Computer = struct {
         this.mem.deinit();
         this.mem = std.AutoHashMap(i64, i64).init(this.alloc);
         this.output.clearRetainingCapacity();
+        this.relBase = 0;
     }
 
     pub fn clearOutput(this: *@This()) void {
