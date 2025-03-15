@@ -4,3 +4,4 @@ zig-out
 docs
 *.a
 *.o
+.DS_Store
