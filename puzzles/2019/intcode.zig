@@ -5,7 +5,7 @@ pub const ReturnMode = union(enum) {
     Continue: void,
     Halted: void,
     Input: i64,
-    Output: void, // return mode when pause-on-output is enabled
+    Output: i64, // return mode when pause-on-output is enabled
 };
 
 pub const AddrMode = enum {
@@ -118,11 +118,11 @@ pub const Computer = struct {
             },
             4 => {
                 const val = this.arg(0, modes[0], this.pc);
-                try this.output.append(val);
                 this.pc += 2;
                 if (this.pauseOnOutput) {
-                    return .Output;
+                    return .{ .Output = val };
                 }
+                try this.output.append(val);
                 return .Continue;
             },
             5 => {

@@ -76,15 +76,16 @@ test "part2" {
         while (true) {
             var c = computers[@mod(i, computers.len)];
             i += 1;
-            const res = try c.run();
+            var res = try c.run();
             switch (res) {
                 .Input => try c.set(res.Input, out),
                 .Halted => break,
                 else => return error.ExpectedInput,
             }
-            switch (try c.run()) {
+            res = try c.run();
+            switch (res) {
                 .Output => {
-                    out = c.output.items[c.output.items.len - 1];
+                    out = res.Output;
                 },
                 .Halted => break,
                 else => return error.ExpectedOutput,
