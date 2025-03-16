@@ -1,7 +1,7 @@
 const std = @import("std");
 
 /// Compute the Manhattan distance between two points in arbitrary dimensional space.
-pub inline fn mdist(a: anytype, b: @TypeOf(a)) u32 {
+pub inline fn mdist(a: anytype, b: @TypeOf(a)) std.meta.Int(.unsigned, @typeInfo(@typeInfo(@TypeOf(a)).vector.child).int.bits + 1) {
     return @reduce(.Add, @abs(a - b));
 }
 
@@ -10,8 +10,8 @@ test mdist {
     const b = @Vector(2, i32){ 3, 4 };
     try std.testing.expectEqual(mdist(a, b), 4);
 
-    const x = @Vector(3, i32){ 1, 2, 3 };
-    const y = @Vector(3, i32){ 4, 5, 6 };
+    const x = @Vector(3, i64){ 1, 2, 3 };
+    const y = @Vector(3, i64){ 4, 5, 6 };
     try std.testing.expectEqual(mdist(x, y), 9);
 }
 
@@ -63,8 +63,8 @@ pub fn aroundD(p: anytype) [std.math.pow(usize, 3, @typeInfo(@TypeOf(p)).vector.
     var result: [std.math.pow(usize, 3, dimensions) - 1]P = @splat(p);
     var count: usize = 0;
 
-    var offsets: @Vector(dimensions, i32) = @splat(-1);
-    const zero: @Vector(dimensions, i32) = @splat(0);
+    var offsets: @TypeOf(p) = @splat(-1);
+    const zero: @TypeOf(p) = @splat(0);
 
     while (count < result.len) {
         // Add this point if it's not the original
