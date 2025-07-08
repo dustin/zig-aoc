@@ -14,12 +14,14 @@ pub fn flood(
     var queue = std.ArrayList(T).init(alloc);
     defer queue.deinit();
     try queue.append(start);
+    var fallback = std.heap.stackFallback(1024, alloc);
+    const stalloc = fallback.get();
+
     while (queue.pop()) |current| {
         if (res.get(current)) |_| continue;
         try res.put(current, {});
 
-        var stalloc = std.heap.stackFallback(1024, alloc);
-        var neighbor_list = std.ArrayList(T).init(stalloc.get());
+        var neighbor_list = std.ArrayList(T).init(stalloc);
         defer neighbor_list.deinit();
         try nf(context, current, &neighbor_list);
 
@@ -70,9 +72,10 @@ pub fn bfs(
     defer seen.deinit();
     try queue.append(start);
     if (try found(context, start)) return;
+    var fallback = std.heap.stackFallback(1024, alloc);
+    const stalloc = fallback.get();
     while (queue.pop()) |current| {
-        var stalloc = std.heap.stackFallback(1024, alloc);
-        var neighbor_list = std.ArrayList(T).init(stalloc.get());
+        var neighbor_list = std.ArrayList(T).init(stalloc);
         defer neighbor_list.deinit();
         try nf(context, current, &neighbor_list);
 
@@ -189,6 +192,8 @@ pub fn astar(
     errdefer res.deinit();
     try queue.add(.{ .cost = 0, .heuristic = 0, .val = start });
 
+    var fallback = std.heap.stackFallback(1024, alloc);
+    const stalloc = fallback.get();
     while (queue.removeOrNull()) |node| {
         if (try found(context, node.val)) {
             res.cost = node.cost;
@@ -196,8 +201,7 @@ pub fn astar(
             return res;
         }
 
-        var stalloc = std.heap.stackFallback(1024, alloc);
-        var neighbor_list = std.ArrayList(Node(T)).init(stalloc.get());
+        var neighbor_list = std.ArrayList(Node(T)).init(stalloc);
         defer neighbor_list.deinit();
         try nf(context, node.val, &neighbor_list);
 
