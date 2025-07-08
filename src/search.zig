@@ -71,6 +71,7 @@ pub fn bfs(
     var seen = std.AutoHashMap(R, void).init(alloc);
     defer seen.deinit();
     try queue.append(start);
+    try seen.put(rf(context, start), {});
     if (try found(context, start)) return;
     var fallback = std.heap.stackFallback(1024, alloc);
     const stalloc = fallback.get();
