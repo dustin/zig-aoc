@@ -7,27 +7,29 @@ const fact_table_size_64 = 21;
 
 const fact_table64 =
     blk: {
-    var tbl64: [fact_table_size_64]u64 = undefined;
-    tbl64[0] = 1;
-    var n: u64 = 1;
-    while (n < fact_table_size_64) : (n += 1) {
-        tbl64[n] = tbl64[n - 1] * n;
-    }
-    break :blk tbl64;
-};
+        var tbl64: [fact_table_size_64]u64 = undefined;
+        tbl64[0] = 1;
+        var n: u64 = 1;
+        while (n < fact_table_size_64) : (n += 1) {
+            tbl64[n] = tbl64[n - 1] * n;
+        }
+        break :blk tbl64;
+    };
 
 const fact_table128 =
     blk: {
-    var tbl128: [fact_table_size_128]u128 = undefined;
-    tbl128[0] = 1;
-    var n: u128 = 1;
-    while (n < fact_table_size_128) : (n += 1) {
-        tbl128[n] = tbl128[n - 1] * n;
-    }
-    break :blk tbl128;
-};
+        var tbl128: [fact_table_size_128]u128 = undefined;
+        tbl128[0] = 1;
+        var n: u128 = 1;
+        while (n < fact_table_size_128) : (n += 1) {
+            tbl128[n] = tbl128[n - 1] * n;
+        }
+        break :blk tbl128;
+    };
 
-fn factorial(comptime T: type, n: anytype) !T {
+pub const Error = error{ ArgumentBounds, Domain, Overflow, OutOfBoundsAccess };
+
+fn factorial(comptime T: type, n: anytype) Error!T {
     const TI = @typeInfo(T);
     return try switch (TI) {
         .int => if (TI.int.bits <= 64)
@@ -40,7 +42,7 @@ fn factorial(comptime T: type, n: anytype) !T {
     };
 }
 
-fn factorialLookup(comptime T: type, n: anytype, table: anytype, limit: anytype) !T {
+fn factorialLookup(comptime T: type, n: anytype, table: anytype, limit: anytype) Error!T {
     if (n < 0) return error.Domain;
     if (n > limit) return error.Overflow;
     if (n >= table.len) return error.OutOfBoundsAccess;
@@ -50,7 +52,7 @@ fn factorialLookup(comptime T: type, n: anytype, table: anytype, limit: anytype)
     return @intCast(f);
 }
 
-pub fn nthperm(a: anytype, n: u128) !void {
+pub fn nthperm(a: anytype, n: u128) Error!void {
     if (a.len == 0) return;
 
     var f = try factorial(u128, a.len);
