@@ -10,7 +10,7 @@ pub fn flood(
     start: anytype,
     comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(T)) OutOfMemory!void,
     res: *std.AutoHashMap(T, void),
-) !void {
+) OutOfMemory!void {
     var queue = std.ArrayList(T).init(alloc);
     defer queue.deinit();
     try queue.append(start);
