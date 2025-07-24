@@ -1,6 +1,5 @@
 const std = @import("std");
 const aoc = @import("aoc");
-const intcode = @import("intcode.zig");
 
 fn fuelReq(i: i32) i32 {
     return @divTrunc(i, 3) - 2;
