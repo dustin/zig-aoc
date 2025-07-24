@@ -53,7 +53,15 @@ fn intersectSet(comptime K: type, alloc: std.mem.Allocator, a: *std.AutoHashMap(
     return intersect(K, u32, void, alloc, a, b, T.combine);
 }
 
-fn intersect(comptime K: type, comptime V: type, comptime OV: type, alloc: std.mem.Allocator, a: *std.AutoHashMap(K, V), b: *std.AutoHashMap(K, V), combine: fn (V, V) ?OV) Error!std.AutoHashMap(K, OV) {
+fn intersect(
+    comptime K: type,
+    comptime V: type,
+    comptime OV: type,
+    alloc: std.mem.Allocator,
+    a: *std.AutoHashMap(K, V),
+    b: *std.AutoHashMap(K, V),
+    combine: fn (V, V) ?OV,
+) Error!std.AutoHashMap(K, OV) {
     var res = std.AutoHashMap(K, OV).init(alloc);
     var it = a.iterator();
     while (it.next()) |e| {
