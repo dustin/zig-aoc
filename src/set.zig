@@ -205,18 +205,46 @@ test difference {
     const K = u32;
     const V = u32;
     const alloc = std.testing.allocator;
-    var a = std.AutoHashMap(K, V).init(alloc);
-    var b = std.AutoHashMap(K, V).init(alloc);
+    const T = struct {
+        max: K,
+        offset: u32 = 0,
+        pub fn next(t: @This(), k: K) ?K {
+            if (k == t.max) return null;
+            return k + 1;
+        }
+        pub fn f(t: @This(), x: K) ?V {
+            return x + t.offset;
+        }
+    };
+    var t = T{ .max = 3 };
+    var a = try mkMap(K, V, alloc, 1, t, T.next, T.f);
+    t.max = 4;
+    t.offset = 10;
+    var b = try mkMap(K, V, alloc, 2, t, T.next, T.f);
+
     defer a.deinit();
     defer b.deinit();
-    try a.put(1, 1);
-    try a.put(2, 2);
-    try a.put(3, 3);
-    try b.put(2, 22);
-    try b.put(3, 23);
-    try b.put(4, 24);
+
     var res = try difference(K, V, alloc, &a, &b);
     defer res.deinit();
     try std.testing.expectEqual(1, res.count());
     try std.testing.expectEqual(1, res.get(1));
+}
+
+pub fn mkMap(
+    comptime K: type,
+    comptime V: type,
+    alloc: std.mem.Allocator,
+    from: K,
+    ctx: anytype,
+    next: fn (ctx: @TypeOf(ctx), k: K) ?K,
+    f: fn (ctx: @TypeOf(ctx), x: K) ?V,
+) Error!std.AutoHashMap(K, V) {
+    var res = std.AutoHashMap(K, V).init(alloc);
+    var k = from;
+    while (true) {
+        if (f(ctx, k)) |e| try res.put(k, e);
+        k = next(ctx, k) orelse break;
+    }
+    return res;
 }
