@@ -46,34 +46,6 @@ fn readDirections(f: std.fs.File.Reader, res: *Path) !void {
 
 const Error = std.mem.Allocator.Error;
 
-fn intersectSet(comptime K: type, alloc: std.mem.Allocator, a: *std.AutoHashMap(K, u32), b: *std.AutoHashMap(K, u32)) Error!std.AutoHashMap(K, void) {
-    const T = struct {
-        fn combine(_: u32, _: u32) ?void {}
-    };
-    return intersect(K, u32, void, alloc, a, b, T.combine);
-}
-
-fn intersect(
-    comptime K: type,
-    comptime V: type,
-    comptime OV: type,
-    alloc: std.mem.Allocator,
-    a: *std.AutoHashMap(K, V),
-    b: *std.AutoHashMap(K, V),
-    combine: fn (V, V) ?OV,
-) Error!std.AutoHashMap(K, OV) {
-    var res = std.AutoHashMap(K, OV).init(alloc);
-    var it = a.iterator();
-    while (it.next()) |e| {
-        if (b.get(e.key_ptr.*)) |bval| {
-            if (combine(e.value_ptr.*, bval)) |value| {
-                try res.put(e.key_ptr.*, value);
-            }
-        }
-    }
-    return res;
-}
-
 fn processFile(comptime T: type, alloc: std.mem.Allocator, path: []const u8, f: fn (std.mem.Allocator, *Path, *Path) Error!T) !T {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
@@ -98,7 +70,7 @@ fn processFile(comptime T: type, alloc: std.mem.Allocator, path: []const u8, f: 
 test "part1" {
     const T = struct {
         fn process(alloc: std.mem.Allocator, w1: *Path, w2: *Path) Error!u32 {
-            var i = try intersectSet(aoc.twod.Point, alloc, w1, w2);
+            var i = try aoc.set.intersectSet(aoc.twod.Point, u32, alloc, w1, w2);
             var it = i.keyIterator();
             var ans: u32 = std.math.maxInt(u32);
             const origin: aoc.twod.Point = .{ 0, 0 };
@@ -119,7 +91,7 @@ test "part2" {
             return a + b;
         }
         fn process(alloc: std.mem.Allocator, w1: *Path, w2: *Path) Error!u32 {
-            var i = try intersect(aoc.twod.Point, u32, u32, alloc, w1, w2, @This().combine);
+            var i = try aoc.set.intersect(aoc.twod.Point, u32, u32, alloc, w1, w2, @This().combine);
             var it = i.iterator();
             var ans: u32 = std.math.maxInt(u32);
             while (it.next()) |e| {
