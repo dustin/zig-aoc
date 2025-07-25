@@ -182,3 +182,41 @@ test unionSet {
     try std.testing.expectEqual(true, res.contains(3));
     try std.testing.expectEqual(true, res.contains(4));
 }
+
+/// Return all of the entries within 'a' that are not within 'b' (by key).
+pub fn difference(
+    comptime K: type,
+    comptime V: type,
+    alloc: std.mem.Allocator,
+    a: *std.AutoHashMap(K, V),
+    b: *std.AutoHashMap(K, V),
+) Error!std.AutoHashMap(K, V) {
+    var res = std.AutoHashMap(K, V).init(alloc);
+    var it = a.iterator();
+    while (it.next()) |e| {
+        if (!b.contains(e.key_ptr.*)) {
+            try res.put(e.key_ptr.*, e.value_ptr.*);
+        }
+    }
+    return res;
+}
+
+test difference {
+    const K = u32;
+    const V = u32;
+    const alloc = std.testing.allocator;
+    var a = std.AutoHashMap(K, V).init(alloc);
+    var b = std.AutoHashMap(K, V).init(alloc);
+    defer a.deinit();
+    defer b.deinit();
+    try a.put(1, 1);
+    try a.put(2, 2);
+    try a.put(3, 3);
+    try b.put(2, 22);
+    try b.put(3, 23);
+    try b.put(4, 24);
+    var res = try difference(K, V, alloc, &a, &b);
+    defer res.deinit();
+    try std.testing.expectEqual(1, res.count());
+    try std.testing.expectEqual(1, res.get(1));
+}
