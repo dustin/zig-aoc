@@ -242,3 +242,75 @@ pub fn mkMap(
     }
     return res;
 }
+
+/// Flip a map K/V into a map V/R with a function that converts a K to an R managing collisions and stuff.
+pub fn flipMap(
+    comptime K: type,
+    comptime V: type,
+    comptime R: type,
+    alloc: std.mem.Allocator,
+    a: *std.AutoHashMap(K, V),
+    ctx: anytype,
+    f: fn (ctx: @TypeOf(ctx), v: K, r: ?R) Error!R,
+) Error!std.AutoHashMap(V, R) {
+    var res = std.AutoHashMap(V, R).init(alloc);
+    var it = a.iterator();
+    while (it.next()) |e| {
+        const x = try res.getOrPut(e.value_ptr.*);
+        if (x.found_existing) {
+            x.value_ptr.* = try f(ctx, e.key_ptr.*, x.value_ptr.*);
+        } else {
+            x.value_ptr.* = try f(ctx, e.key_ptr.*, null);
+        }
+    }
+    return res;
+}
+
+/// A K->R function for collecting keys.
+pub fn flipCollect(comptime K: type, comptime R: type) fn (alloc: std.mem.Allocator, K, ?std.ArrayList(R)) Error!std.ArrayList(R) {
+    return struct {
+        fn f(alloc: std.mem.Allocator, x: K, r: ?std.ArrayList(R)) Error!std.ArrayList(R) {
+            var a: std.ArrayList(R) = undefined;
+            if (r == null) {
+                a = std.ArrayList(R).init(alloc);
+            } else {
+                a = r.?;
+            }
+            try a.append(x);
+            return a;
+        }
+    }.f;
+}
+
+/// Free a map created by flipMap with flipCollect.
+pub fn freeVRMap(comptime V: type, comptime R: type, _: std.mem.Allocator, m: *std.AutoHashMap(V, std.ArrayList(R))) void {
+    var it = m.iterator();
+    while (it.next()) |entry| {
+        entry.value_ptr.*.clearAndFree();
+    }
+    m.deinit();
+}
+
+test flipMap {
+    const alloc = std.testing.allocator;
+
+    const M = struct {
+        fn next(_: void, k: u32) ?u32 {
+            if (k == 5) return null;
+            return k + 1;
+        }
+        fn f(_: void, x: u32) ?bool {
+            return @mod(x, 2) == 0;
+        }
+    };
+    var m = try mkMap(u32, bool, alloc, 1, {}, M.next, M.f);
+    defer m.deinit();
+    var b = try flipMap(u32, bool, std.ArrayList(u32), alloc, &m, alloc, flipCollect(u32, u32));
+    defer freeVRMap(bool, u32, alloc, &b);
+    try std.testing.expectEqual(2, b.count());
+    const evens = b.get(true) orelse undefined;
+    const odds = b.get(false) orelse undefined;
+    try std.testing.expectEqual(2, evens.items.len);
+    try std.testing.expectEqual(3, odds.items.len);
+    // std.debug.print("evens: {d}, odds: {d}", .{ evens.items, odds.items });
+}
