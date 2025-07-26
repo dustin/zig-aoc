@@ -5,6 +5,7 @@ pub const grid = @import("grid.zig");
 pub const permute = @import("permute.zig");
 pub const indy = @import("indy.zig");
 pub const set = @import("set.zig");
+pub const list = @import("list.zig");
 
 const std = @import("std");
 
@@ -17,6 +18,7 @@ comptime {
         _ = permute;
         _ = indy;
         _ = set;
+        _ = list;
     }
 }
 

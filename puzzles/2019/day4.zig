@@ -1,4 +1,5 @@
 const std = @import("std");
+const aoc = @import("aoc");
 
 pub const lowest = 264360;
 pub const highest = 746325;
@@ -48,46 +49,6 @@ test "part1" {
     try std.testing.expectEqual(945, count);
 }
 
-const Error = std.mem.Allocator.Error;
-
-fn Counted(comptime T: type) type {
-    return struct {
-        value: T,
-        count: usize,
-    };
-}
-
-fn rle(comptime T: type, alloc: std.mem.Allocator, input: []const T) Error!std.ArrayList(Counted(T)) {
-    var res = std.ArrayList(Counted(T)).init(alloc);
-    var i: usize = 0;
-    while (i < input.len) {
-        var count: usize = 1;
-        while (i + 1 < input.len and input[i] == input[i + 1]) {
-            count += 1;
-            i += 1;
-        }
-        try res.append(.{ .value = input[i], .count = count });
-        i += 1;
-    }
-    return res;
-}
-
-test rle {
-    const rled = try rle(u8, std.testing.allocator, "ABBCCDEFFF");
-    defer rled.deinit();
-
-    const want = [_]Counted(u8){
-        .{ .value = 'A', .count = 1 },
-        .{ .value = 'B', .count = 2 },
-        .{ .value = 'C', .count = 2 },
-        .{ .value = 'D', .count = 1 },
-        .{ .value = 'E', .count = 1 },
-        .{ .value = 'F', .count = 3 },
-    };
-
-    try std.testing.expectEqualDeep(&want, rled.items);
-}
-
 fn digitize(p: u32) [6]u8 {
     var digits: [6]u8 = @splat(0);
     var r = @divTrunc(p, 10);
@@ -112,7 +73,7 @@ fn isPassword2(alloc: std.mem.Allocator, p: u32) !bool {
 
     const digits = digitize(p);
 
-    const rled = try rle(u8, alloc, &digits);
+    const rled = try aoc.list.rle(u8, alloc, &digits);
     defer rled.deinit();
 
     for (rled.items) |item| {
