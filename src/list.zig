@@ -72,21 +72,39 @@ test rle {
     try std.testing.expectEqualDeep(&want, rled.items);
 }
 
+fn expand(comptime T: type, alloc: std.mem.Allocator, input: []const Counted(T)) Error!std.ArrayList(T) {
+    var expanded = std.ArrayList(T).init(alloc);
+    for (input) |item| {
+        try expanded.appendNTimes(item.value, item.count);
+    }
+    return expanded;
+}
+
+test expand {
+    const input = [_]Counted(u8){
+        .{ .value = 'A', .count = 1 },
+        .{ .value = 'B', .count = 2 },
+        .{ .value = 'C', .count = 2 },
+        .{ .value = 'D', .count = 1 },
+        .{ .value = 'E', .count = 1 },
+        .{ .value = 'F', .count = 3 },
+    };
+
+    const expected = "ABBCCDEFFF";
+    const actual = try expand(u8, std.testing.allocator, &input);
+    defer actual.deinit();
+
+    try std.testing.expectEqualSlices(u8, expected, actual.items);
+}
+
 test "fuzz rle" {
     const T = struct {
         pub fn compDecomp(_: i32, in: []const u8) anyerror!void {
             const rled = try rle(u8, std.testing.allocator, in);
             defer rled.deinit();
-            var decoded = try std.testing.allocator.alloc(u8, rled.items.len);
-            defer std.testing.allocator.free(decoded);
-            var out: usize = 0;
-            for (rled.items) |item| {
-                for (0..item.count) |_| {
-                    decoded[out] = item.value;
-                    out += 1;
-                }
-            }
-            try std.testing.expectEqualSlices(u8, in, decoded);
+            var decoded = try expand(u8, std.testing.allocator, rled.items);
+            defer decoded.deinit();
+            try std.testing.expectEqualSlices(u8, in, decoded.items);
         }
     };
 
