@@ -15,18 +15,30 @@ pub fn intersectSet(
     }.combine);
 }
 
+// Create a simple map(u32,u32) with keys from `from` to `to` where each value equals the key.
+fn simpleMap(alloc: std.mem.Allocator, from: u32, to: u32) Error!std.AutoHashMap(u32, u32) {
+    const T = struct {
+        max: u32,
+        pub fn next(t: @This(), k: u32) ?u32 {
+            if (k == t.max) return null;
+            return k + 1;
+        }
+        pub fn f(_: @This(), x: u32) ?u32 {
+            return x;
+        }
+    };
+    const t = T{ .max = to };
+    return mkMap(u32, u32, alloc, from, t, T.next, T.f);
+}
+
 test intersectSet {
     const K = u32;
     const V = u32;
     const alloc = std.testing.allocator;
-    var a = std.AutoHashMap(K, V).init(alloc);
-    var b = std.AutoHashMap(K, V).init(alloc);
+    var a = try simpleMap(alloc, 1, 2);
+    var b = try simpleMap(alloc, 2, 3);
     defer a.deinit();
     defer b.deinit();
-    try a.put(1, 1);
-    try a.put(2, 2);
-    try b.put(2, 2);
-    try b.put(3, 3);
     var res = try intersectSet(K, V, alloc, &a, &b);
     defer res.deinit();
     try std.testing.expectEqual(res.count(), 1);
@@ -60,16 +72,10 @@ test intersect {
     const V = u32;
     const OV = u32;
     const alloc = std.testing.allocator;
-    var a = std.AutoHashMap(K, V).init(alloc);
-    var b = std.AutoHashMap(K, V).init(alloc);
+    var a = try simpleMap(alloc, 1, 3);
+    var b = try simpleMap(alloc, 2, 4);
     defer a.deinit();
     defer b.deinit();
-    try a.put(1, 1);
-    try a.put(2, 2);
-    try a.put(3, 3);
-    try b.put(2, 2);
-    try b.put(3, 3);
-    try b.put(4, 4);
     var res = try intersect(K, V, OV, alloc, &a, &b, struct {
         fn combine(v1: V, v2: V) ?OV {
             if (v1 + v2 > 5) return null; // This prevents 3 from being included in the result.
@@ -124,16 +130,10 @@ test unionMap {
     const V = u32;
     const OV = u32;
     const alloc = std.testing.allocator;
-    var a = std.AutoHashMap(K, V).init(alloc);
-    var b = std.AutoHashMap(K, V).init(alloc);
+    var a = try simpleMap(alloc, 1, 3);
+    var b = try simpleMap(alloc, 2, 4);
     defer a.deinit();
     defer b.deinit();
-    try a.put(1, 1);
-    try a.put(2, 2);
-    try a.put(3, 3);
-    try b.put(2, 2);
-    try b.put(3, 3);
-    try b.put(4, 4);
     var res = try unionMap(K, V, OV, alloc, &a, &b, struct {
         fn combine(v1: V, v2: ?V) ?OV {
             if (v1 + (v2 orelse 0) > 5) return null; // This prevents 3 from being included in the result.
@@ -164,16 +164,10 @@ test unionSet {
     const K = u32;
     const V = u32;
     const alloc = std.testing.allocator;
-    var a = std.AutoHashMap(K, V).init(alloc);
-    var b = std.AutoHashMap(K, V).init(alloc);
+    var a = try simpleMap(alloc, 1, 3);
+    var b = try simpleMap(alloc, 2, 4);
     defer a.deinit();
     defer b.deinit();
-    try a.put(1, 1);
-    try a.put(2, 2);
-    try a.put(3, 3);
-    try b.put(2, 2);
-    try b.put(3, 3);
-    try b.put(4, 4);
     var res = try unionSet(K, V, alloc, &a, &b);
     defer res.deinit();
     try std.testing.expectEqual(4, res.count());
