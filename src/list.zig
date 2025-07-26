@@ -11,7 +11,7 @@ pub fn Counted(comptime T: type) type {
 }
 
 /// A typed identify function.
-pub fn identity(comptime T: type) fn (t: T) T {
+pub inline fn identity(comptime T: type) fn (t: T) T {
     return struct {
         fn id(t: T) T {
             return t;
