@@ -91,10 +91,9 @@ pub fn build(b: *std.Build) !void {
 
         if (std.mem.indexOf(u8, content, "pub fn main") != null) {
             var namebuf: [64]u8 = undefined;
-            var nbs = std.io.fixedBufferStream(&namebuf);
-            try std.fmt.format(nbs.writer(), "{s}-{s}", .{ pf.year, pf.day });
+            const written = try std.fmt.bufPrint(&namebuf, "{s}-{s}", .{ pf.year, pf.day });
             const exe = b.addExecutable(.{
-                .name = nbs.getWritten(),
+                .name = written,
                 .root_module = b.createModule(.{
                     .root_source_file = b.path(pf.path),
                     .target = target,

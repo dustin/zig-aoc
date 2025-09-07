@@ -3,7 +3,7 @@ const aoc = @import("aoc");
 
 const Path = std.AutoHashMap(aoc.twod.Point, u32);
 
-fn readDirections(f: *std.io.Reader, res: *Path) !void {
+fn readDirections(f: *std.Io.Reader, res: *Path) !void {
     var more: bool = true;
     var pos: aoc.twod.Point = .{ 0, 0 };
     var steps: u32 = 0;
