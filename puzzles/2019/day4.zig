@@ -73,8 +73,8 @@ fn isPassword2(alloc: std.mem.Allocator, p: u32) !bool {
 
     const digits = digitize(p);
 
-    const rled = try aoc.list.rle(u8, alloc, &digits);
-    defer rled.deinit();
+    var rled = try aoc.list.rle(u8, alloc, &digits);
+    defer rled.deinit(alloc);
 
     for (rled.items) |item| {
         if (item.count == 2) return true;

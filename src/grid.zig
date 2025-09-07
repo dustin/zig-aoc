@@ -79,12 +79,12 @@ test parseGrid {
 
     const Item = struct { x: i32, y: i32, v: u8 };
 
-    var al = std.ArrayList(Item).init(std.testing.allocator);
-    defer al.deinit();
+    var al = std.ArrayList(Item).initCapacity(std.testing.allocator, 9) catch unreachable;
+    defer al.deinit(std.testing.allocator);
     var it = grid.iterate();
     while (it.next()) |pv| {
         try std.testing.expectEqual(pv.value, grid.lookup(pv.point));
-        try al.append(Item{ .x = pv.point[0], .y = pv.point[1], .v = pv.value });
+        try al.append(std.testing.allocator, Item{ .x = pv.point[0], .y = pv.point[1], .v = pv.value });
     }
     const exp = [_]Item{
         .{ .x = 0, .y = 0, .v = 'A' },

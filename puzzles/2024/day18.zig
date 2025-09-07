@@ -4,13 +4,14 @@ const aoc = @import("aoc");
 const Point = aoc.twod.Point;
 
 const A = struct {
+    alloc: std.mem.Allocator,
     pointMap: std.AutoHashMap(aoc.twod.Point, void) = undefined,
     bounds: aoc.indy.Bounds(2) = .{ .mins = @splat(0), .maxs = .{ 70, 70 } },
 
     pub fn nf(this: *@This(), p: Point, neighbors: *std.ArrayList(aoc.search.Node(Point))) aoc.search.OutOfMemory!void {
         for (aoc.indy.around(p)) |np| {
             if (this.bounds.contains(np) and this.pointMap.get(np) == null) {
-                try neighbors.append(.{ .cost = 1, .heuristic = @intCast(aoc.indy.mdist(this.bounds.maxs, np)), .val = np });
+                try neighbors.append(this.alloc, .{ .cost = 1, .heuristic = @intCast(aoc.indy.mdist(this.bounds.maxs, np)), .val = np });
             }
         }
     }
@@ -37,23 +38,23 @@ const I = struct {
         var it = std.mem.splitSequence(u8, line, ",");
         p[0] = try aoc.input.parseInt(i32, it.next() orelse return false);
         p[1] = try aoc.input.parseInt(i32, it.next() orelse return false);
-        try this.lines.append(p);
+        try this.lines.append(this.alloc, p);
         return true;
     }
 
     pub fn init(this: *@This(), alloc: std.mem.Allocator, p: []const u8) !I {
         this.alloc = alloc;
-        this.lines = std.ArrayList(Point).init(alloc);
+        this.lines = try std.ArrayList(Point).initCapacity(alloc, 100);
         try aoc.input.parseLines(p, this, I.parseLine);
         return this.*;
     }
 
     pub fn deinit(this: *I) void {
-        this.lines.deinit();
+        this.lines.deinit(this.alloc);
     }
 
     pub fn run(this: *@This(), maxLines: u32) !aoc.search.AStarResult(Point, Point) {
-        var a = A{ .pointMap = std.AutoHashMap(aoc.twod.Point, void).init(this.alloc) };
+        var a = A{ .alloc = this.alloc, .pointMap = std.AutoHashMap(aoc.twod.Point, void).init(this.alloc) };
         defer a.deinit();
         for (this.lines.items[0..maxLines]) |p| {
             a.pointMap.put(p, void{}) catch return error.ParseError;

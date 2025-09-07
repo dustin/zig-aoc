@@ -11,9 +11,9 @@ pub fn flood(
     comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(T)) OutOfMemory!void,
     res: *std.AutoHashMap(T, void),
 ) OutOfMemory!void {
-    var queue = std.ArrayList(T).init(alloc);
-    defer queue.deinit();
-    try queue.append(start);
+    var queue = try std.ArrayList(T).initCapacity(alloc, 1024);
+    defer queue.deinit(alloc);
+    try queue.append(alloc, start);
     var fallback = std.heap.stackFallback(1024, alloc);
     const stalloc = fallback.get();
 
@@ -21,12 +21,12 @@ pub fn flood(
         if (res.get(current)) |_| continue;
         try res.put(current, {});
 
-        var neighbor_list = std.ArrayList(T).init(stalloc);
-        defer neighbor_list.deinit();
+        var neighbor_list = try std.ArrayList(T).initCapacity(stalloc, 8);
+        defer neighbor_list.deinit(stalloc);
         try nf(context, current, &neighbor_list);
 
         for (neighbor_list.items) |neighbor| {
-            try queue.append(neighbor);
+            try queue.append(alloc, neighbor);
         }
     }
 }
@@ -37,12 +37,12 @@ test flood {
         pub fn neighbs(ctx: i32, point: P, neighbors: *std.ArrayList(P)) OutOfMemory!void {
             if (point[0] < 10 and point[0] >= 0) {
                 if (point[0] + 1 == ctx) {
-                    try neighbors.append(.{ point[0] + 2, point[1] });
+                    try neighbors.append(std.testing.allocator, .{ point[0] + 2, point[1] });
                 } else {
-                    try neighbors.append(.{ point[0] + 1, point[1] });
+                    try neighbors.append(std.testing.allocator, .{ point[0] + 1, point[1] });
                 }
                 if (point[0] - 1 != ctx) {
-                    try neighbors.append(.{ point[0] - 1, point[1] });
+                    try neighbors.append(std.testing.allocator, .{ point[0] - 1, point[1] });
                 }
             }
         }
@@ -66,25 +66,25 @@ pub fn bfs(
     comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(T)) OutOfMemory!void,
     comptime found: fn (@TypeOf(context), @TypeOf(start)) OutOfMemory!bool, // if true, stop searching
 ) OutOfMemory!void {
-    var queue = std.ArrayList(T).init(alloc);
-    defer queue.deinit();
+    var queue = try std.ArrayList(T).initCapacity(alloc, 1024);
+    defer queue.deinit(alloc);
     var seen = std.AutoHashMap(R, void).init(alloc);
     defer seen.deinit();
-    try queue.append(start);
+    try queue.append(alloc, start);
     try seen.put(rf(context, start), {});
     if (try found(context, start)) return;
     var fallback = std.heap.stackFallback(1024, alloc);
     const stalloc = fallback.get();
     while (queue.pop()) |current| {
-        var neighbor_list = std.ArrayList(T).init(stalloc);
-        defer neighbor_list.deinit();
+        var neighbor_list = try std.ArrayList(T).initCapacity(stalloc, 8);
+        defer neighbor_list.deinit(stalloc);
         try nf(context, current, &neighbor_list);
 
         for (neighbor_list.items) |neighbor| {
             if (seen.get(rf(context, neighbor))) |_| continue;
             if (try found(context, neighbor)) return;
             try seen.put(rf(context, neighbor), {});
-            try queue.append(neighbor);
+            try queue.append(alloc, neighbor);
         }
     }
 }
@@ -98,7 +98,7 @@ test bfs {
 
         pub fn neighbs(_: *@This(), point: P, neighbors: *std.ArrayList(P)) OutOfMemory!void {
             if (point[0] < 10 and point[0] >= 0) {
-                try neighbors.append(.{ point[0] + 1, point[1] + 1 });
+                try neighbors.append(std.testing.allocator, .{ point[0] + 1, point[1] + 1 });
             }
         }
 
@@ -155,8 +155,8 @@ pub fn AStarResult(comptime T: type, comptime R: type) type {
             if (mend == null) return null;
             const finalScore = mend.?.@"0";
 
-            var res = std.ArrayList(R).init(alloc);
-            try res.append(end);
+            var res = try std.ArrayList(R).initCapacity(alloc, 10);
+            try res.append(alloc, end);
             var current = end;
             while (true) {
                 if (std.meta.eql(current, start)) {
@@ -164,14 +164,14 @@ pub fn AStarResult(comptime T: type, comptime R: type) type {
                 }
                 const next = self.scores.get(current);
                 if (next) |n| {
-                    try res.insert(0, n.@"1");
+                    try res.insert(self.alloc, 0, n.@"1");
                     current = n.@"1";
                 } else {
                     break;
                 }
             }
 
-            return .{ finalScore, try res.toOwnedSlice() };
+            return .{ finalScore, try res.toOwnedSlice(alloc) };
         }
     };
 }
@@ -202,8 +202,8 @@ pub fn astar(
             return res;
         }
 
-        var neighbor_list = std.ArrayList(Node(T)).init(stalloc);
-        defer neighbor_list.deinit();
+        var neighbor_list = try std.ArrayList(Node(T)).initCapacity(stalloc, 8);
+        defer neighbor_list.deinit(stalloc);
         try nf(context, node.val, &neighbor_list);
 
         for (neighbor_list.items) |n| {
@@ -226,10 +226,10 @@ test astar {
         target: i32 = 0,
 
         pub fn nf(_: *@This(), point: NT, neighbors: *std.ArrayList(Node(NT))) OutOfMemory!void {
-            try neighbors.append(.{ .cost = 1, .heuristic = 1, .val = .{ point[0] + 1, point[1] + 1 } });
-            try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] + 1, point[1] - 1 } });
-            try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] + 1 } });
-            try neighbors.append(.{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] - 1 } });
+            try neighbors.append(std.testing.allocator, .{ .cost = 1, .heuristic = 1, .val = .{ point[0] + 1, point[1] + 1 } });
+            try neighbors.append(std.testing.allocator, .{ .cost = 1, .heuristic = 0, .val = .{ point[0] + 1, point[1] - 1 } });
+            try neighbors.append(std.testing.allocator, .{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] + 1 } });
+            try neighbors.append(std.testing.allocator, .{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] - 1 } });
         }
         pub fn rf(_: *@This(), p: NT) NT {
             return p;

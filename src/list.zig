@@ -21,7 +21,7 @@ pub inline fn identity(comptime T: type) fn (t: T) T {
 
 /// Perform run length encoding on a slice of elements where equality is determined comparison to the 'r' function.
 pub fn rleOn(comptime T: type, comptime R: type, alloc: std.mem.Allocator, r: fn (T) R, input: []const T) Error!std.ArrayList(Counted(T)) {
-    var res = std.ArrayList(Counted(T)).init(alloc);
+    var res = try std.ArrayList(Counted(T)).initCapacity(alloc, input.len);
     var i: usize = 0;
     while (i < input.len) {
         var count: usize = 1;
@@ -29,15 +29,15 @@ pub fn rleOn(comptime T: type, comptime R: type, alloc: std.mem.Allocator, r: fn
             count += 1;
             i += 1;
         }) {}
-        try res.append(.{ .value = input[i], .count = count });
+        try res.append(alloc, .{ .value = input[i], .count = count });
         i += 1;
     }
     return res;
 }
 
 test rleOn {
-    const rled = try rleOn(u8, u8, std.testing.allocator, std.ascii.toUpper, "ABBCCDEFfF");
-    defer rled.deinit();
+    var rled = try rleOn(u8, u8, std.testing.allocator, std.ascii.toUpper, "ABBCCDEFfF");
+    defer rled.deinit(std.testing.allocator);
 
     const want = [_]Counted(u8){
         .{ .value = 'A', .count = 1 },
@@ -57,8 +57,8 @@ pub fn rle(comptime T: type, alloc: std.mem.Allocator, input: []const T) Error!s
 }
 
 test rle {
-    const rled = try rle(u8, std.testing.allocator, "ABBCCDEFFF");
-    defer rled.deinit();
+    var rled = try rle(u8, std.testing.allocator, "ABBCCDEFFF");
+    defer rled.deinit(std.testing.allocator);
 
     const want = [_]Counted(u8){
         .{ .value = 'A', .count = 1 },
@@ -73,9 +73,9 @@ test rle {
 }
 
 fn expand(comptime T: type, alloc: std.mem.Allocator, input: []const Counted(T)) Error!std.ArrayList(T) {
-    var expanded = std.ArrayList(T).init(alloc);
+    var expanded = try std.ArrayList(T).initCapacity(alloc, input.len);
     for (input) |item| {
-        try expanded.appendNTimes(item.value, item.count);
+        try expanded.appendNTimes(alloc, item.value, item.count);
     }
     return expanded;
 }
@@ -91,8 +91,8 @@ test expand {
     };
 
     const expected = "ABBCCDEFFF";
-    const actual = try expand(u8, std.testing.allocator, &input);
-    defer actual.deinit();
+    var actual = try expand(u8, std.testing.allocator, &input);
+    defer actual.deinit(std.testing.allocator);
 
     try std.testing.expectEqualSlices(u8, expected, actual.items);
 }
@@ -100,10 +100,10 @@ test expand {
 test "fuzz rle" {
     const T = struct {
         pub fn compDecomp(_: i32, in: []const u8) anyerror!void {
-            const rled = try rle(u8, std.testing.allocator, in);
-            defer rled.deinit();
+            var rled = try rle(u8, std.testing.allocator, in);
+            defer rled.deinit(std.testing.allocator);
             var decoded = try expand(u8, std.testing.allocator, rled.items);
-            defer decoded.deinit();
+            defer decoded.deinit(std.testing.allocator);
             try std.testing.expectEqualSlices(u8, in, decoded.items);
         }
     };

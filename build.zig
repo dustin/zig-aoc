@@ -17,21 +17,9 @@ pub fn build(b: *std.Build) !void {
 
     const aoc = b.addModule("aoc", .{
         .root_source_file = b.path("src/root.zig"),
-    });
-
-    const lib = b.addStaticLibrary(.{
-        .name = "zig-aoc",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
-        .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
-
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step (the default step when
-    // running `zig build`).
-    b.installArtifact(lib);
 
     const zigthesis = b.dependency("zigthesis", .{
         .target = target,
@@ -47,8 +35,8 @@ pub fn build(b: *std.Build) !void {
         path: []const u8,
     };
 
-    var puzzle_files = std.ArrayList(Puzzle).init(b.allocator);
-    defer puzzle_files.deinit();
+    var puzzle_files = try std.ArrayList(Puzzle).initCapacity(b.allocator, 100);
+    defer puzzle_files.deinit(b.allocator);
 
     // Open the puzzles directory and iterate its entries.
     var puzzles_dir = std.fs.cwd().openDir("puzzles", .{ .iterate = true }) catch |err| {
@@ -79,7 +67,7 @@ pub fn build(b: *std.Build) !void {
                 // Extract the day string from "day<number>.zig"
                 const day = name[3 .. name.len - 4];
                 const path = try std.fmt.allocPrint(b.allocator, "puzzles/{s}/{s}", .{ year, name });
-                try puzzle_files.append(Puzzle{
+                try puzzle_files.append(b.allocator, Puzzle{
                     .year = try b.allocator.dupe(u8, year),
                     .day = try b.allocator.dupe(u8, day),
                     .path = path,
@@ -103,18 +91,22 @@ pub fn build(b: *std.Build) !void {
             try std.fmt.format(nbs.writer(), "{s}-{s}", .{ pf.year, pf.day });
             const exe = b.addExecutable(.{
                 .name = nbs.getWritten(),
-                .root_source_file = b.path(pf.path),
-                .target = target,
-                .optimize = optimize,
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path(pf.path),
+                    .target = target,
+                    .optimize = optimize,
+                }),
             });
             exe.root_module.addImport("aoc", aoc);
             b.installArtifact(exe);
         }
 
         const exe_unit_tests = b.addTest(.{
-            .root_source_file = b.path(pf.path),
-            .target = target,
-            .optimize = optimize,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(pf.path),
+                .target = target,
+                .optimize = optimize,
+            }),
         });
         exe_unit_tests.root_module.addImport("aoc", aoc);
         const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
@@ -122,9 +114,11 @@ pub fn build(b: *std.Build) !void {
     }
 
     const lib_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/root.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);

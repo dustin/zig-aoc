@@ -62,5 +62,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
     var m = try run(allocator, .White);
     defer m.deinit();
-    try aoc.twod.drawMap(Color, std.io.getStdOut().writer(), ' ', colorize, m);
+    var writer_buf: [128]u8 = undefined;
+    var stdout = std.fs.File.stdout().writer(&writer_buf);
+    try aoc.twod.drawMap(Color, &stdout.interface, ' ', colorize, m);
 }

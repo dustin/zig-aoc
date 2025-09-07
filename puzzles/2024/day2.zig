@@ -6,15 +6,15 @@ const P = struct {
     nums: std.ArrayList([]i32),
 
     pub fn parseLine(this: *@This(), line: []const u8) aoc.input.ParseError!bool {
-        var nums = std.ArrayList(i32).init(this.alloc);
-        defer nums.deinit();
+        var nums = try std.ArrayList(i32).initCapacity(this.alloc, 10);
+        defer nums.deinit(this.alloc);
 
         var it = std.mem.tokenizeSequence(u8, line, " ");
         while (it.next()) |token| {
             const num = try aoc.input.parseInt(i32, token);
-            try nums.append(num);
+            try nums.append(this.alloc, num);
         }
-        try this.nums.append(try nums.toOwnedSlice());
+        try this.nums.append(this.alloc, try nums.toOwnedSlice(this.alloc));
         return true;
     }
 
@@ -22,14 +22,14 @@ const P = struct {
         for (this.nums.items) |nums| {
             this.alloc.free(nums);
         }
-        this.nums.deinit();
+        this.nums.deinit(this.alloc);
     }
 };
 
 const filePath: []const u8 = "input/2024/day2";
 
 fn newP(alloc: std.mem.Allocator, path: []const u8) !P {
-    var p = P{ .alloc = alloc, .nums = std.ArrayList([]i32).init(alloc) };
+    var p = P{ .alloc = alloc, .nums = try std.ArrayList([]i32).initCapacity(alloc, 10) };
     try aoc.input.parseLines(path, &p, P.parseLine);
     return p;
 }

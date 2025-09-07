@@ -122,7 +122,7 @@ test "movement" {
     try zigthesis.falsifyWith(T.invFwdByfwdEquiv, "n invFwd == invFwdBy n", .{ .max_iterations = 100, .onError = zigthesis.failOnError });
 }
 
-pub fn drawMap(comptime T: type, w: anytype, def: u8, f: fn (T) u8, map: anytype) !void {
+pub fn drawMap(comptime T: type, w: *std.io.Writer, def: u8, f: fn (T) u8, map: anytype) !void {
     var bounds = indy.newBounds(2);
     var iter = map.iterator();
     while (iter.next()) |entry| {

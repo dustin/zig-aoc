@@ -3,12 +3,12 @@ const aoc = @import("aoc");
 
 const Path = std.AutoHashMap(aoc.twod.Point, u32);
 
-fn readDirections(f: std.fs.File.Reader, res: *Path) !void {
+fn readDirections(f: *std.io.Reader, res: *Path) !void {
     var more: bool = true;
     var pos: aoc.twod.Point = .{ 0, 0 };
     var steps: u32 = 0;
     while (more) {
-        const b = f.readByte() catch |err| switch (err) {
+        const b = f.takeByte() catch |err| switch (err) {
             error.EndOfStream => break,
             else => return err,
         };
@@ -23,7 +23,7 @@ fn readDirections(f: std.fs.File.Reader, res: *Path) !void {
         }
         var amt: usize = 0;
         while (true) {
-            const d = f.readByte() catch |err| switch (err) {
+            const d = f.takeByte() catch |err| switch (err) {
                 error.EndOfStream => break,
                 else => return err,
             };
@@ -50,7 +50,8 @@ fn processFile(comptime T: type, alloc: std.mem.Allocator, path: []const u8, f: 
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
 
-    const reader = file.reader();
+    var buf: [4096]u8 = undefined;
+    var reader = file.reader(buf[0..]);
 
     var arena = try alloc.create(std.heap.ArenaAllocator);
     defer alloc.destroy(arena);
@@ -60,9 +61,9 @@ fn processFile(comptime T: type, alloc: std.mem.Allocator, path: []const u8, f: 
     const aalloc = arena.allocator();
 
     var wire1 = std.AutoHashMap(aoc.twod.Point, u32).init(aalloc);
-    try readDirections(reader, &wire1);
+    try readDirections(&reader.interface, &wire1);
     var wire2 = std.AutoHashMap(aoc.twod.Point, u32).init(aalloc);
-    try readDirections(reader, &wire2);
+    try readDirections(&reader.interface, &wire2);
 
     return f(aalloc, &wire1, &wire2);
 }

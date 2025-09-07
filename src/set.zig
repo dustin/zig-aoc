@@ -272,21 +272,21 @@ pub fn flipCollect(comptime K: type, comptime R: type) fn (alloc: std.mem.Alloca
         fn f(alloc: std.mem.Allocator, x: K, r: ?std.ArrayList(R)) Error!std.ArrayList(R) {
             var a: std.ArrayList(R) = undefined;
             if (r == null) {
-                a = std.ArrayList(R).init(alloc);
+                a = try std.ArrayList(R).initCapacity(alloc, 1);
             } else {
                 a = r.?;
             }
-            try a.append(x);
+            try a.append(alloc, x);
             return a;
         }
     }.f;
 }
 
 /// Free a map created by flipMap with flipCollect.
-pub fn freeVRMap(comptime V: type, comptime R: type, _: std.mem.Allocator, m: *std.AutoHashMap(V, std.ArrayList(R))) void {
+pub fn freeVRMap(comptime V: type, comptime R: type, alloc: std.mem.Allocator, m: *std.AutoHashMap(V, std.ArrayList(R))) void {
     var it = m.iterator();
     while (it.next()) |entry| {
-        entry.value_ptr.*.clearAndFree();
+        entry.value_ptr.*.clearAndFree(alloc);
     }
     m.deinit();
 }

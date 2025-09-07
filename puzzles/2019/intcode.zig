@@ -55,12 +55,12 @@ pub const Computer = struct {
     pub fn deinit(this: *@This()) void {
         this.mem.deinit();
         this.alloc.free(this.rom);
-        this.output.deinit();
+        this.output.deinit(this.alloc);
     }
 
     pub fn duplicate(this: *@This()) !*Computer {
         const mem = try this.mem.cloneWithAllocator(this.alloc);
-        const output = try this.output.clone();
+        const output = try this.output.clone(this.alloc);
         const rom = try this.alloc.alloc(i64, this.rom.len);
         std.mem.copyForwards(i64, rom, this.rom);
         var comp = try this.alloc.create(Computer);
@@ -122,7 +122,7 @@ pub const Computer = struct {
                 if (this.pauseOnOutput) {
                     return .{ .Output = val };
                 }
-                try this.output.append(val);
+                try this.output.append(this.alloc, val);
                 return .Continue;
             },
             5 => {
@@ -203,28 +203,38 @@ pub fn newComputer(alloc: std.mem.Allocator, mem: []const i64) !Computer {
         .alloc = alloc,
         .mem = std.AutoHashMap(i64, i64).init(alloc),
         .rom = rom,
-        .output = std.ArrayList(i64).init(alloc),
+        .output = try std.ArrayList(i64).initCapacity(alloc, mem.len),
     };
 }
 
 pub fn readFile(alloc: std.mem.Allocator, path: []const u8) !Computer {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
-    var reader = file.reader();
+    var buf: [4096]u8 = undefined;
+    var reader = file.reader(buf[0..]);
 
-    var nums = std.ArrayList(i64).init(alloc);
-    defer nums.deinit();
+    var nums = try std.ArrayList(i64).initCapacity(alloc, 100);
+    defer nums.deinit(alloc);
 
-    while (true) {
-        var lineBuf: [256]u8 = undefined;
-        var token = (try reader.readUntilDelimiterOrEof(&lineBuf, ',')) orelse break;
-        if (token[token.len - 1] == '\n') {
-            token = token[0 .. token.len - 1];
+    var ri = &reader.interface;
+    while (ri.takeDelimiterExclusive(',')) |token| {
+        var t = token;
+        if (t[t.len - 1] == '\n') {
+            t = t[0 .. t.len - 1];
         }
-        const num = try aoc.input.parseInt(i64, token);
-        try nums.append(num);
+        const num = try aoc.input.parseInt(i64, t);
+        try nums.append(alloc, num);
+    } else |err| switch (err) {
+        error.EndOfStream => {},
+        error.StreamTooLong,
+        error.ReadFailed,
+        => |e| {
+            std.debug.print("Error reading file: {} after {d} ints from {s}\n", .{ e, nums.items.len, path });
+            return e;
+            // return e;
+            // do nothing
+        },
     }
-
     return newComputer(alloc, nums.items);
 }
 

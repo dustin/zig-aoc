@@ -6,13 +6,23 @@ pub const ParseError = error{ ParseError, OutOfMemory };
 pub fn parseLines(path: []const u8, context: anytype, parseFun: fn (ctx: @TypeOf(context), line: []const u8) ParseError!bool) !void {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
-    var reader = file.reader();
+    var buffer: [4096]u8 = undefined;
+    var reader = file.reader(buffer[0..]);
 
-    var keepGoing = true;
-    while (keepGoing) {
-        var lineBuf: [256]u8 = undefined;
-        const line = (try reader.readUntilDelimiterOrEof(&lineBuf, '\n')) orelse return;
-        keepGoing = try parseFun(context, line);
+    var i: u32 = 0;
+    var ri = &reader.interface;
+    while (ri.takeDelimiterExclusive('\n')) |line| {
+        if (!try parseFun(context, line)) {
+            return {};
+        }
+        i += 1;
+    } else |err| {
+        if (err == error.EndOfStream) {
+            return {};
+        } else {
+            std.debug.print("error {} after {d} lines\n", .{ err, i });
+            return err;
+        }
     }
 }
 
