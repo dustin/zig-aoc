@@ -115,7 +115,11 @@ pub fn openFileGrid(alloc: std.mem.Allocator, path: []const u8) !FileGrid {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
 
-    const contents = try file.readToEndAlloc(alloc, 65536);
+    const st = try file.stat();
+    var buf: [8192]u8 = undefined;
+    var reader = file.reader(buf[0..]);
+    var ri = &reader.interface;
+    const contents = try ri.readAlloc(alloc, st.size);
 
     return FileGrid{
         .alloc = alloc,
