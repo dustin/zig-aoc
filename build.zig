@@ -34,8 +34,7 @@ pub fn build(b: *std.Build) !void {
         const year = year_entry.name;
 
         // Open each year subdirectory.
-        const year_path = try std.fmt.allocPrint(b.allocator, "puzzles/{s}", .{year});
-        var year_dir = std.fs.cwd().openDir(year_path, .{ .iterate = true }) catch |err| {
+        var year_dir = std.fs.cwd().openDir(b.fmt("puzzles/{s}", .{year}), .{ .iterate = true }) catch |err| {
             std.debug.print("Failed to open {s} directory: {}\n", .{ year, err });
             continue;
         };
@@ -49,11 +48,10 @@ pub fn build(b: *std.Build) !void {
             if (std.mem.startsWith(u8, name, "day") and std.mem.endsWith(u8, name, ".zig")) {
                 // Extract the day string from "day<number>.zig"
                 const day = name[3 .. name.len - 4];
-                const path = try std.fmt.allocPrint(b.allocator, "puzzles/{s}/{s}", .{ year, name });
                 try puzzle_files.append(b.allocator, Puzzle{
                     .year = try b.allocator.dupe(u8, year),
                     .day = try b.allocator.dupe(u8, day),
-                    .path = path,
+                    .path = b.fmt("puzzles/{s}/{s}", .{ year, name }),
                 });
             }
         }
@@ -74,10 +72,8 @@ pub fn build(b: *std.Build) !void {
         _ = try ri.streamRemaining(&w.writer);
 
         if (std.mem.indexOf(u8, w.written(), "pub fn main") != null) {
-            var namebuf: [64]u8 = undefined;
-            const written = try std.fmt.bufPrint(&namebuf, "{s}-{s}", .{ pf.year, pf.day });
             const exe = b.addExecutable(.{
-                .name = written,
+                .name = b.fmt("{s}-{s}", .{ pf.year, pf.day }),
                 .root_module = b.createModule(.{
                     .root_source_file = b.path(pf.path),
                     .target = target,
