@@ -82,14 +82,15 @@ pub fn build(b: *std.Build) !void {
         // If there's a main, let's build an executable.
         const puzzle_file = try std.fs.cwd().openFile(pf.path, .{});
         defer puzzle_file.close();
-        const st = try puzzle_file.stat();
         var buf: [8192]u8 = undefined;
         var reader = puzzle_file.reader(buf[0..]);
         var ri = &reader.interface;
-        const content = try ri.readAlloc(b.allocator, st.size);
-        defer b.allocator.free(content);
 
-        if (std.mem.indexOf(u8, content, "pub fn main") != null) {
+        var w = std.Io.Writer.Allocating.init(b.allocator);
+        defer w.deinit();
+        _ = try ri.streamRemaining(&w.writer);
+
+        if (std.mem.indexOf(u8, w.written(), "pub fn main") != null) {
             var namebuf: [64]u8 = undefined;
             const written = try std.fmt.bufPrint(&namebuf, "{s}-{s}", .{ pf.year, pf.day });
             const exe = b.addExecutable(.{

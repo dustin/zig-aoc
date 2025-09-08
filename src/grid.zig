@@ -114,16 +114,17 @@ pub const FileGrid = struct {
 pub fn openFileGrid(alloc: std.mem.Allocator, path: []const u8) !FileGrid {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();
-
-    const st = try file.stat();
     var buf: [8192]u8 = undefined;
     var reader = file.reader(buf[0..]);
     var ri = &reader.interface;
-    const contents = try ri.readAlloc(alloc, st.size);
+
+    var w = std.Io.Writer.Allocating.init(alloc);
+    defer w.deinit();
+    _ = try ri.streamRemaining(&w.writer);
 
     return FileGrid{
         .alloc = alloc,
-        .grid = parseGrid(contents) orelse return error.ParseError,
+        .grid = parseGrid(try w.toOwnedSlice()) orelse return error.ParseError,
     };
 }
 
