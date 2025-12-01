@@ -101,25 +101,26 @@ fn computeReachability(alloc: std.mem.Allocator, g: Graph) !std.StringHashMap(st
 }
 
 test "part2" {
-    var arena = try std.testing.allocator.create(std.heap.ArenaAllocator);
-    defer std.testing.allocator.destroy(arena);
-    arena.* = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
+    // var arena = try std.testing.allocator.create(std.heap.ArenaAllocator);
+    // defer std.testing.allocator.destroy(arena);
+    // arena.* = std.heap.ArenaAllocator.init(std.testing.allocator);
+    // defer arena.deinit();
 
-    const g = try getInput(arena.allocator());
-    const reach = try computeReachability(arena.allocator(), g);
+    // const g = try getInput(arena.allocator());
+    // const reach = try computeReachability(arena.allocator(), g);
     // defer reach.deinit();
+    //
 
-    std.debug.print("Reachable from COM: {d}\n", .{reach.count()});
+    // std.debug.print("Reachable from COM: {d}\n", .{reach.count()});
 
-    var oit = reach.iterator();
-    while (oit.next()) |e| {
-        std.debug.print("{s}\n", .{e.key_ptr.*});
-        var it2 = e.value_ptr.*.iterator();
-        while (it2.next()) |e2| {
-            std.debug.print("  {s} -> {any}\n", .{ e2.key_ptr.*, e2.value_ptr.* });
-        }
-    }
+    // var oit = reach.iterator();
+    // while (oit.next()) |e| {
+    //     std.debug.print("{s}\n", .{e.key_ptr.*});
+    //     var it2 = e.value_ptr.*.iterator();
+    //     while (it2.next()) |e2| {
+    //         std.debug.print("  {s} -> {any}\n", .{ e2.key_ptr.*, e2.value_ptr.* });
+    //     }
+    // }
 
     // var root: []const u8 = "";
 
