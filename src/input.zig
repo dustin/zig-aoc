@@ -48,3 +48,32 @@ test "line parsing" {
     try parseLines("input/2024/day18.ex", &sum, T.parseLine);
     try std.testing.expectEqual(69082, sum);
 }
+
+/// Split a string on a delimeter and call a function on each chunk.
+pub fn splitMap(in: []const u8, delim: []const u8, context: anytype, chunkFun: fn (ctx: @TypeOf(context), chunk: []const u8) ParseError!void) !void {
+    var it = std.mem.splitSequence(u8, in, delim);
+    while (it.next()) |c| {
+        try chunkFun(context, c);
+    }
+}
+
+test "splitMap" {
+    const in = "123,456,789";
+    const want: [3]u16 = .{ 123, 456, 789 };
+
+    const T = struct {
+        pos: usize = 0,
+        vals: [3]u16 = .{ 0, 0, 0 },
+
+        fn next(t: *@This(), ns: []const u8) ParseError!void {
+            t.vals[t.pos] = try parseInt(u16, ns);
+            t.pos += 1;
+        }
+    };
+
+    var t: T = .{};
+
+    try splitMap(in, ",", &t, T.next);
+
+    try std.testing.expectEqual(want, t.vals);
+}
