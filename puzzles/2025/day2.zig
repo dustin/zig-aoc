@@ -31,34 +31,74 @@ fn dlength(xin: u64) usize {
     return rv;
 }
 
-fn isOdd(x: usize) bool {
-    return @mod(x, 2) == 1;
+const Repeater = struct {
+    n: u64,
+    reps: usize,
+
+    fn increment(r: *@This()) void {
+        r.n += 1;
+    }
+
+    fn value(r: *@This()) u64 {
+        var rv = r.n;
+        const w = @as(u64, @intCast(dlength(r.n)));
+        for (1..r.reps) |_| {
+            rv = rv * std.math.pow(u64, 10, w) + r.n;
+        }
+        return rv;
+    }
+};
+
+test "repeater" {
+    var r = Repeater{ .n = 123, .reps = 2 };
+    r.increment();
+    try std.testing.expectEqual(124124, r.value());
 }
 
-fn dblNum(x: u64) u64 {
-    return (x * std.math.pow(u64, 10, @as(u64, @intCast(dlength(x))))) + x;
+fn mkRepeater(n: u64, reps: usize) ?Repeater {
+    const w = dlength(n);
+    if (@mod(w, reps) != 0) {
+        return null;
+    }
+    const sz = w / reps;
+    const off = w - sz;
+    return Repeater{ .n = n / std.math.pow(u64, 10, @as(u64, @intCast(off))), .reps = reps };
+}
+
+test mkRepeater {
+    const r2 = mkRepeater(123456, 2).?;
+    try std.testing.expectEqual(123, r2.n);
+    try std.testing.expectEqual(2, r2.reps);
+    const r3 = mkRepeater(123456, 3).?;
+    try std.testing.expectEqual(12, r3.n);
+    try std.testing.expectEqual(3, r3.reps);
+}
+
+fn fitStart(x: u64, target: usize) u64 {
+    if (dlength(x) == target) {
+        return x;
+    }
+    return std.math.pow(u64, 10, @as(u64, target - 1));
 }
 
 fn doubles(v: V) u64 {
-    var start = v.start;
-    if (isOdd(dlength(start))) {
-        start = std.math.pow(u64, 10, @as(u64, @intCast(dlength(start))));
+    var target = dlength(v.start);
+    if (@mod(target, 2) == 1) {
+        target += 1;
     }
-    var end = v.end;
-    if (isOdd(dlength(end))) {
-        end = std.math.pow(u64, 10, @as(u64, @intCast(dlength(end))) - 1) - 1;
-    }
-    var halfNum = start / std.math.pow(u64, 10, @as(u64, @intCast(dlength(start))) / 2);
+    const start = fitStart(v.start, target);
+
+    var r = mkRepeater(start, 2) orelse return 0;
 
     var rv: u64 = 0;
 
     while (true) {
-        const dbl = dblNum(halfNum);
-        halfNum += 1;
+        const dbl = r.value();
+        r.increment();
         if (dbl < start) {
             continue;
         }
-        if (dbl > end) {
+        if (dbl > v.end) {
             return rv;
         }
         rv += dbl;
