@@ -126,3 +126,65 @@ test "part1" {
     defer input.deinit(std.testing.allocator);
     try std.testing.expectEqual(22062284697, count(input.items));
 }
+
+fn doubles2(seen: *std.AutoHashMap(u64, void), v: V, len: usize, reps: usize) u64 {
+    if (len == 0) {
+        return 0;
+    }
+    var r: Repeater = .{ .n = std.math.pow(u64, 10, @as(u64, len - 1)), .reps = reps };
+
+    var rv: u64 = 0;
+
+    while (true) {
+        const dbl = r.value();
+        r.increment();
+        if (dbl < v.start) {
+            continue;
+        }
+        if (dbl > v.end) {
+            return rv;
+        }
+        if (seen.get(dbl)) |_| continue;
+        seen.put(dbl, {}) catch {};
+        // std.debug.print("Match: {}\n", .{dbl});
+        rv += dbl;
+    }
+
+    return rv;
+}
+
+fn allGroups(alloc: std.mem.Allocator, v: V) u64 {
+    var rv: u64 = 0;
+    var seen = std.AutoHashMap(u64, void).init(alloc);
+    defer seen.deinit();
+
+    const magdiff = dlength(v.start) != dlength(v.end);
+
+    for (2..dlength(v.end) + 1) |l| {
+        rv += doubles2(&seen, v, dlength(v.start) / l, l);
+        if (magdiff) {
+            rv += doubles2(&seen, v, dlength(v.end) / l, l);
+        }
+    }
+    return rv;
+}
+
+fn count2(alloc: std.mem.Allocator, ns: []const V) u64 {
+    var rv: u64 = 0;
+    for (ns) |v| {
+        rv += allGroups(alloc, v);
+    }
+    return rv;
+}
+
+test "part2ex" {
+    var example = try parseInput(std.testing.allocator, exampleStr);
+    defer example.deinit(std.testing.allocator);
+    try std.testing.expectEqual(4174379265, count2(std.testing.allocator, example.items));
+}
+
+test "part2" {
+    var example = try parseInput(std.testing.allocator, inputStr);
+    defer example.deinit(std.testing.allocator);
+    try std.testing.expectEqual(46666175279, count2(std.testing.allocator, example.items));
+}
