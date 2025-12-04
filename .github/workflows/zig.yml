@@ -13,8 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        zig_version: ["0.15.1", "master"]
-        os: ["ubuntu-latest", "macos-latest", "ubuntu-24.04-arm"]
+        zig_version: ['0.15.2']
+        os: ['ubuntu-latest', 'macos-latest', 'ubuntu-24.04-arm']
 
     steps:
       - name: Check out repository
