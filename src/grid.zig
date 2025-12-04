@@ -7,26 +7,28 @@ pub const PointValue = struct {
     value: u8,
 };
 
-pub const GridIterator = struct {
-    grid: Grid,
-    point: twod.Point,
+pub fn GridIterator(T: type) type {
+    return struct {
+        grid: T,
+        point: twod.Point,
 
-    pub fn next(this: *GridIterator) ?PointValue {
-        if (@reduce(.And, this.point == this.grid.bounds.maxs)) {
+        pub fn next(this: *@This()) ?PointValue {
+            if (@reduce(.And, this.point == this.grid.bounds.maxs)) {
+                return null;
+            }
+            if (this.point[0] == this.grid.bounds.maxs[0]) {
+                this.point[0] = 0;
+                this.point[1] += 1;
+            } else {
+                this.point[0] += 1;
+            }
+            if (this.grid.lookup(this.point)) |v| {
+                return .{ .point = this.point, .value = v };
+            }
             return null;
         }
-        if (this.point[0] == this.grid.bounds.maxs[0]) {
-            this.point[0] = 0;
-            this.point[1] += 1;
-        } else {
-            this.point[0] += 1;
-        }
-        if (this.grid.lookup(this.point)) |v| {
-            return .{ .point = this.point, .value = v };
-        }
-        return null;
-    }
-};
+    };
+}
 
 pub const Grid = struct {
     bounds: indy.Bounds(2),
@@ -40,8 +42,41 @@ pub const Grid = struct {
         return this.bytes[@intCast(index)];
     }
 
-    pub fn iterate(this: @This()) GridIterator {
+    pub fn iterate(this: @This()) GridIterator(Grid) {
         return .{ .grid = this, .point = .{ -1, 0 } };
+    }
+
+    pub fn mutable(this: @This(), alloc: std.mem.Allocator) !MutableGrid {
+        return MutableGrid{ .bounds = this.bounds, .bytes = try alloc.dupe(u8, this.bytes) };
+    }
+};
+
+pub const MutableGrid = struct {
+    bounds: indy.Bounds(2),
+    bytes: []u8,
+
+    pub fn lookup(this: @This(), p: twod.Point) ?u8 {
+        if (!this.bounds.contains(p)) {
+            return null;
+        }
+        const index = p[1] * (this.bounds.maxs[0] + 2) + p[0];
+        return this.bytes[@intCast(index)];
+    }
+
+    pub fn set(this: @This(), p: twod.Point, v: u8) void {
+        if (!this.bounds.contains(p)) {
+            return;
+        }
+        const index = p[1] * (this.bounds.maxs[0] + 2) + p[0];
+        this.bytes[@intCast(index)] = v;
+    }
+
+    pub fn iterate(this: @This()) GridIterator(MutableGrid) {
+        return .{ .grid = this, .point = .{ -1, 0 } };
+    }
+
+    pub fn deinit(this: @This(), alloc: std.mem.Allocator) void {
+        alloc.free(this.bytes);
     }
 };
 
