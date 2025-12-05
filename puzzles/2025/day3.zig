@@ -16,13 +16,17 @@ fn select(row: []const u8, want: i32, totes: u64) u64 {
     return select(maxr[1..], want - 1, (totes * 10) + maxv);
 }
 
-fn part1(g: aoc.grid.Grid) u64 {
+fn joltage(g: aoc.grid.Grid, n: i32) u64 {
     var totes: u64 = 0;
     var it = g.rows();
     while (it.next()) |r| {
-        totes += select(r, 2, 0);
+        totes += select(r, n, 0);
     }
     return totes;
+}
+
+fn part1(g: aoc.grid.Grid) u64 {
+    return joltage(g, 2);
 }
 
 test "part1ex" {
@@ -38,12 +42,7 @@ test "part1" {
 }
 
 fn part2(g: aoc.grid.Grid) u64 {
-    var totes: u64 = 0;
-    var it = g.rows();
-    while (it.next()) |r| {
-        totes += select(r, 12, 0);
-    }
-    return totes;
+    return joltage(g, 12);
 }
 
 test "part2ex" {
