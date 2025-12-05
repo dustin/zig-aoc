@@ -30,6 +30,18 @@ pub fn GridIterator(T: type) type {
     };
 }
 
+pub fn RowIterator(T: type) type {
+    return struct {
+        grid: T,
+        rnum: usize,
+
+        pub fn next(this: *@This()) ?[]const u8 {
+            defer this.rnum += 1;
+            return this.grid.row(this.rnum);
+        }
+    };
+}
+
 pub const Grid = struct {
     bounds: indy.Bounds(2),
     bytes: []const u8,
@@ -48,6 +60,21 @@ pub const Grid = struct {
 
     pub fn mutable(this: @This(), alloc: std.mem.Allocator) !MutableGrid {
         return MutableGrid{ .bounds = this.bounds, .bytes = try alloc.dupe(u8, this.bytes) };
+    }
+
+    pub fn row(this: @This(), rowNum: usize) ?[]const u8 {
+        const start: usize = rowNum * @as(usize, @intCast(this.bounds.maxs[0] + 2));
+        const end: usize = 1 + start + @as(usize, @intCast(this.bounds.maxs[0]));
+
+        if (end > this.bytes.len) {
+            return null;
+        }
+
+        return this.bytes[start..end];
+    }
+
+    pub fn rows(this: @This()) RowIterator(@This()) {
+        return .{ .grid = this, .rnum = 0 };
     }
 };
 
@@ -133,6 +160,12 @@ test parseGrid {
         .{ .x = 2, .y = 2, .v = 'I' },
     };
     try std.testing.expectEqualSlices(Item, &exp, al.items);
+
+    if (grid.row(1)) |r| {
+        try std.testing.expectEqualSlices(u8, "DEF", r);
+    } else {
+        return error.OOB;
+    }
 }
 
 /// A grid parsed from a file.

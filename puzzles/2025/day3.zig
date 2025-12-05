@@ -1,43 +1,26 @@
 const std = @import("std");
 const aoc = @import("aoc");
 
-fn digit(g: aoc.grid.Grid, p: aoc.twod.Point) ?u8 {
-    if (g.lookup(p)) |d| {
-        return d - 48;
-    }
-    return null;
-}
-
-fn select(g: aoc.grid.Grid, start: aoc.twod.Point, want: i32, totes: u64) u64 {
-    if (want == 0) {
-        return totes;
-    }
-    const end = g.bounds.maxs[0] - want + 2;
-
-    const d = digit(g, start);
-    var maxp = start;
-    var maxv = d.?;
-    for (@as(usize, @intCast(start[0]))..@as(usize, @intCast(end))) |col| {
-        const p = .{ @as(i32, @intCast(col)), start[1] };
-        if (digit(g, p)) |dp| {
-            if (dp > maxv) {
-                maxp = p;
-                maxv = dp;
-            }
-            // Nothing gonna be bigger than this.
-            if (maxv == 9) {
-                break;
-            }
+fn select(row: []const u8, want: i32, totes: u64) u64 {
+    if (want == 0) return totes;
+    var r = row;
+    var maxv = r[0] - 48;
+    var maxr = r;
+    while (r.len >= want) : (r = r[1..]) {
+        const dp = r[0] - 48;
+        if (dp > maxv) {
+            maxv = dp;
+            maxr = r;
         }
     }
-    maxp[0] = maxp[0] + 1;
-    return select(g, maxp, want - 1, (totes * 10) + maxv);
+    return select(maxr[1..], want - 1, (totes * 10) + maxv);
 }
 
-fn part1(g: aoc.grid.Grid) u32 {
-    var totes: u32 = 0;
-    for (0..1 + @as(usize, @intCast(g.bounds.maxs[1]))) |row| {
-        totes += @intCast(select(g, .{ 0, @as(i32, @intCast(row)) }, 2, 0));
+fn part1(g: aoc.grid.Grid) u64 {
+    var totes: u64 = 0;
+    var it = g.rows();
+    while (it.next()) |r| {
+        totes += select(r, 2, 0);
     }
     return totes;
 }
@@ -56,8 +39,9 @@ test "part1" {
 
 fn part2(g: aoc.grid.Grid) u64 {
     var totes: u64 = 0;
-    for (0..1 + @as(usize, @intCast(g.bounds.maxs[1]))) |row| {
-        totes += select(g, .{ 0, @as(i32, @intCast(row)) }, 12, 0);
+    var it = g.rows();
+    while (it.next()) |r| {
+        totes += select(r, 12, 0);
     }
     return totes;
 }
