@@ -88,27 +88,24 @@ test "part1" {
 }
 
 fn mergeAll(alloc: std.mem.Allocator, ranges: []const Range) ![]Range {
+    var sorted = try alloc.dupe(Range, ranges);
+    defer alloc.free(sorted);
+    std.sort.pdq(Range, sorted, {}, Range.asc);
+
     var rv = try std.ArrayList(Range).initCapacity(alloc, ranges.len);
     errdefer rv.deinit(alloc);
-    var todo = try std.ArrayList(Range).initCapacity(alloc, ranges.len);
-    errdefer rv.deinit(alloc);
-    try todo.appendSlice(alloc, ranges);
-    std.sort.pdq(Range, todo.items, {}, Range.asc);
-    while (todo.items.len > 0) {
-        var tmp = try std.ArrayList(Range).initCapacity(alloc, todo.items.len);
-        defer tmp.deinit(alloc);
-        var el1 = todo.items[0];
-        for (todo.items[1..]) |r| {
-            if (el1.overlaps(r)) {
-                el1 = el1.merge(r);
-            } else {
-                try tmp.append(alloc, r);
-            }
+
+    var current = sorted[0];
+    for (sorted[1..]) |r| {
+        if (current.overlaps(r)) {
+            current = current.merge(r);
+        } else {
+            try rv.append(alloc, current);
+            current = r;
         }
-        todo.clearAndFree(alloc);
-        try todo.appendSlice(alloc, tmp.items);
-        try rv.append(alloc, el1);
     }
+    try rv.append(alloc, current);
+
     return try rv.toOwnedSlice(alloc);
 }
 
