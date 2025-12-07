@@ -110,3 +110,100 @@ test "fuzz rle" {
 
     try std.testing.fuzz(@as(i32, 0), T.compDecomp, .{});
 }
+
+/// Transpose a slice of slices.  If lenghts are different, only the smallest will be considered.
+pub fn transpose(comptime T: type, alloc: std.mem.Allocator, orig: [][]const T, def: ?T) Error!([][]T) {
+    if (orig.len == 0) {
+        return try (alloc.alloc([]T, 0));
+    }
+    var newWidth: usize = orig[0].len;
+    for (orig) |o| {
+        if (def == null) {
+            if (o.len < newWidth) newWidth = o.len;
+        } else {
+            if (o.len > newWidth) newWidth = o.len;
+        }
+    }
+    var rv = try alloc.alloc([]T, newWidth);
+    for (0..newWidth) |w| {
+        rv[w] = try alloc.alloc(T, orig.len);
+        for (0..orig.len) |h| {
+            if (orig[h].len > w) {
+                rv[w][h] = orig[h][w];
+            } else {
+                rv[w][h] = def.?;
+            }
+        }
+    }
+    return rv;
+}
+
+test "transpose regular" {
+    const a: [2][3]i8 = .{ .{ 1, 2, 3 }, .{ 4, 5, 6 } };
+    const want: [3][2]i8 = .{ .{ 1, 4 }, .{ 2, 5 }, .{ 3, 6 } };
+
+    const a_slice = [_][]const i8{ &a[0], &a[1] };
+    const a_slice_ptr: [][]const i8 = @ptrCast(@constCast(a_slice[0..]));
+
+    const r = try transpose(i8, std.testing.allocator, a_slice_ptr, null);
+
+    defer {
+        for (r) |row| {
+            std.testing.allocator.free(row);
+        }
+        std.testing.allocator.free(r);
+    }
+
+    try std.testing.expectEqual(@as(usize, 3), r.len);
+    for (want, 0..) |w, i| {
+        try std.testing.expectEqualSlices(i8, &w, r[i]);
+    }
+}
+
+test "transpose irregular (no default)" {
+    const a1: [3]i8 = .{ 1, 2, 3 };
+    const a2: [4]i8 = .{ 4, 5, 6, 7 };
+    const a: [2][]const i8 = .{ a1[0..], a2[0..] };
+    const want: [3][2]i8 = .{ .{ 1, 4 }, .{ 2, 5 }, .{ 3, 6 } };
+
+    const a_slice = [_][]const i8{ a[0], a[1] };
+    const a_slice_ptr: [][]const i8 = @ptrCast(@constCast(a_slice[0..]));
+
+    const r = try transpose(i8, std.testing.allocator, a_slice_ptr, null);
+
+    defer {
+        for (r) |row| {
+            std.testing.allocator.free(row);
+        }
+        std.testing.allocator.free(r);
+    }
+
+    try std.testing.expectEqual(@as(usize, 3), r.len);
+    for (want, 0..) |w, i| {
+        try std.testing.expectEqualSlices(i8, &w, r[i]);
+    }
+}
+
+test "transpose irregular (with default)" {
+    const a1: [3]i8 = .{ 1, 2, 3 };
+    const a2: [4]i8 = .{ 4, 5, 6, 7 };
+    const a: [2][]const i8 = .{ a1[0..], a2[0..] };
+    const want: [4][2]i8 = .{ .{ 1, 4 }, .{ 2, 5 }, .{ 3, 6 }, .{ -1, 7 } };
+
+    const a_slice = [_][]const i8{ a[0], a[1] };
+    const a_slice_ptr: [][]const i8 = @ptrCast(@constCast(a_slice[0..]));
+
+    const r = try transpose(i8, std.testing.allocator, a_slice_ptr, -1);
+
+    defer {
+        for (r) |row| {
+            std.testing.allocator.free(row);
+        }
+        std.testing.allocator.free(r);
+    }
+
+    try std.testing.expectEqual(@as(usize, 4), r.len);
+    for (want, 0..) |w, i| {
+        try std.testing.expectEqualSlices(i8, &w, r[i]);
+    }
+}
