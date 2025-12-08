@@ -15,6 +15,18 @@ test mdist {
     try std.testing.expectEqual(mdist(x, y), 9);
 }
 
+/// Euclidean Distance
+pub inline fn edist(a: anytype, b: @TypeOf(a)) f64 {
+    const diffs = a - b;
+    return @sqrt(@as(f64, @floatFromInt(@reduce(.Add, diffs * diffs))));
+}
+
+test edist {
+    const a = @Vector(3, i32){ 162, 817, 812 };
+    const b = @Vector(3, i32){ 425, 690, 689 };
+    try std.testing.expectApproxEqRel(edist(a, b), 316.9, 0.1);
+}
+
 /// Returns just the orthogonal neighbors (neighbors that differ in exactly one dimension)
 pub fn around(p: anytype) [2 * @typeInfo(@TypeOf(p)).vector.len](@TypeOf(p)) {
     const P = @TypeOf(p);
