@@ -15,10 +15,13 @@ test mdist {
     try std.testing.expectEqual(mdist(x, y), 9);
 }
 
+inline fn square(a: anytype) @TypeOf(a) {
+    return a * a;
+}
+
 /// Euclidean Distance
 pub inline fn edist(a: anytype, b: @TypeOf(a)) f64 {
-    const diffs = a - b;
-    return @sqrt(@as(f64, @floatFromInt(@reduce(.Add, diffs * diffs))));
+    return @sqrt(@as(f64, @floatFromInt(@reduce(.Add, square(a - b)))));
 }
 
 test edist {
