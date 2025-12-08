@@ -58,6 +58,16 @@ pub const Grid = struct {
         return .{ .grid = this, .point = .{ -1, 0 } };
     }
 
+    pub fn find(this: @This(), needle: u8) ?twod.Point {
+        var it = this.iterate();
+        while (it.next()) |pv| {
+            if (pv.value == needle) {
+                return pv.point;
+            }
+        }
+        return null;
+    }
+
     pub fn mutable(this: @This(), alloc: std.mem.Allocator) !MutableGrid {
         return MutableGrid{ .bounds = this.bounds, .bytes = try alloc.dupe(u8, this.bytes) };
     }
