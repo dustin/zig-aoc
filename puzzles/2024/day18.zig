@@ -20,6 +20,8 @@ const A = struct {
         return p;
     }
 
+    pub fn nfin(_: *@This(), _: Point) void {}
+
     pub fn found(this: *@This(), p: Point) aoc.search.OutOfMemory!bool {
         return @reduce(.And, p == this.bounds.maxs);
     }
@@ -61,7 +63,7 @@ const I = struct {
         }
         const start = aoc.twod.origin;
 
-        return aoc.search.astar(Point, Point, this.alloc, &a, start, A.rf, A.nf, A.found);
+        return aoc.search.astar(Point, Point, this.alloc, &a, start, A.rf, A.nf, A.nfin, A.found);
     }
 };
 

@@ -186,6 +186,7 @@ pub fn astar(
     start: T,
     comptime rf: fn (@TypeOf(context), @TypeOf(start)) R,
     comptime nf: fn (@TypeOf(context), @TypeOf(start), *std.ArrayList(Node(T))) OutOfMemory!void,
+    comptime nfin: fn (@TypeOf(context), @TypeOf(start)) void,
     comptime found: fn (@TypeOf(context), @TypeOf(start)) OutOfMemory!bool, // if true, stop searching
 ) OutOfMemory!AStarResult(T, R) {
     var queue = std.PriorityQueue(Node(T), void, Node(T).comp).init(alloc, {});
@@ -197,6 +198,7 @@ pub fn astar(
     var fallback = std.heap.stackFallback(1024, alloc);
     const stalloc = fallback.get();
     while (queue.removeOrNull()) |node| {
+        defer nfin(context, node.val);
         if (try found(context, node.val)) {
             res.cost = node.cost;
             res.val = node.val;
@@ -232,6 +234,9 @@ test astar {
             try neighbors.append(std.testing.allocator, .{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] + 1 } });
             try neighbors.append(std.testing.allocator, .{ .cost = 1, .heuristic = 0, .val = .{ point[0] - 1, point[1] - 1 } });
         }
+
+        pub fn nfin(_: *@This(), _: NT) void {}
+
         pub fn rf(_: *@This(), p: NT) NT {
             return p;
         }
@@ -243,7 +248,7 @@ test astar {
 
     const allocator = std.testing.allocator;
     var tee = T{ .target = 5 };
-    var res = try astar(NT, NT, allocator, &tee, NT{ 0, 0 }, T.rf, T.nf, T.found);
+    var res = try astar(NT, NT, allocator, &tee, NT{ 0, 0 }, T.rf, T.nf, T.nfin, T.found);
     defer res.deinit();
 
     try std.testing.expectEqual(5, res.cost);
