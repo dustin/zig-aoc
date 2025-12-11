@@ -75,7 +75,8 @@ pub fn bfs(
     if (try found(context, start)) return;
     var fallback = std.heap.stackFallback(1024, alloc);
     const stalloc = fallback.get();
-    while (queue.pop()) |current| {
+    while (queue.items.len > 0) {
+        const current = queue.orderedRemove(0);
         var neighbor_list = try std.ArrayList(T).initCapacity(stalloc, 8);
         defer neighbor_list.deinit(stalloc);
         try nf(context, current, &neighbor_list);
