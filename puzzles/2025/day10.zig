@@ -20,6 +20,16 @@ const Button = struct {
     fn affect(this: @This(), state: u16) u16 {
         return state ^ this.val;
     }
+
+    fn jolt(this: @This(), jolts: []const u16, out: []u16) void {
+        for (0..jolts.len) |i| {
+            if ((this.val >> @as(u4, @intCast(i)) & 1 == 1)) {
+                out[i] = jolts[i] + 1;
+            } else {
+                out[i] = jolts[i];
+            }
+        }
+    }
 };
 
 fn formatLights(l: u16, w: *std.Io.Writer) std.Io.Writer.Error!void {
@@ -206,7 +216,6 @@ fn findSequence(alloc: std.mem.Allocator, m: Machine) !u16 {
         al: std.mem.Allocator,
 
         pub fn neighbs(this: *@This(), st: State, neighbors: *std.ArrayList(State)) aoc.search.OutOfMemory!void {
-            // std.debug.print("finding neighbors for {f}\n", .{st});
             seen: for (this.m.buttons) |b| {
                 for (st.buttons.items) |ob| {
                     if (b.val == ob.val) continue :seen;
@@ -218,14 +227,6 @@ fn findSequence(alloc: std.mem.Allocator, m: Machine) !u16 {
                 var stc = State{ .buttons = clonep, .lights = b.affect(st.lights) };
                 try stc.buttons.append(this.al, b);
                 try neighbors.append(this.al, stc);
-
-                // stc.lights = 0;
-                // for (stc.buttons.items) |ib| {
-                //     std.debug.print("  {f} ^ {f} = {f}\n", .{ Light{ .l = stc.lights }, ib, Light{ .l = ib.affect(stc.lights) } });
-                //     stc.lights = ib.affect(stc.lights);
-                // }
-
-                // std.debug.print("  Neighbor: {f} ({d})\n", .{ stc, this.rf(stc) });
             }
         }
 
@@ -287,12 +288,42 @@ fn part1(alloc: std.mem.Allocator, filename: []const u8) !u16 {
     const ins = try parseInput(alloc, filename);
     defer freeInput(alloc, ins);
 
-    var rv: u16 = 0;
-    for (ins) |m| {
-        const x = try findSequence(alloc, m.*);
-        rv += x;
+    const Item = struct {
+        machine: Machine,
+        result: u16 = 0,
+        al: std.mem.Allocator,
+
+        fn go(this: *@This()) void {
+            this.result = findSequence(this.al, this.machine) catch 0;
+        }
+    };
+
+    var items = try alloc.alloc(*Item, ins.len);
+    for (ins, 0..) |m, i| {
+        var itemp = try alloc.create(Item);
+        itemp.machine = m.*;
+        itemp.al = alloc;
+        items[i] = itemp;
     }
+    defer {
+        for (items) |i| {
+            alloc.destroy(i);
+        }
+        alloc.free(items);
+    }
+
+    try aoc.par.map(alloc, Item.go, items);
+
+    var rv: u16 = 0;
+    for (items) |i| rv += i.result;
     return rv;
+
+    // var rv: u16 = 0;
+    // for (ins) |m| {
+    //     const x = try findSequence(alloc, m.*);
+    //     rv += x;
+    // }
+    // return rv;
 }
 
 test "part1ex" {
@@ -303,4 +334,152 @@ test "part1ex" {
 test "part1" {
     const alloc = std.testing.allocator;
     try std.testing.expectEqual(452, try part1(alloc, "input/2025/day10"));
+}
+
+fn findSequence2(alloc: std.mem.Allocator, m: Machine) !u16 {
+    var arena = try alloc.create(std.heap.ArenaAllocator);
+    defer alloc.destroy(arena);
+    arena.* = std.heap.ArenaAllocator.init(alloc);
+    defer arena.deinit();
+
+    const aalloc = arena.allocator();
+
+    const State = struct {
+        jolts: []u16,
+        buttons: *std.ArrayList(Button),
+
+        pub fn format(this: @This(), w: *std.Io.Writer) std.Io.Writer.Error!void {
+            try w.print("{any} ", .{this.jolts});
+            for (this.buttons.items) |b| {
+                try w.print("{f} ", .{b});
+            }
+        }
+    };
+
+    const T = struct {
+        m: Machine,
+        al: std.mem.Allocator,
+
+        pub fn neighbs(this: *@This(), st: State, neighbors: *std.ArrayList(aoc.search.Node(State))) aoc.search.OutOfMemory!void {
+            // std.debug.print("finding neighbors for {f}\n", .{st});
+            oot: for (this.m.buttons) |b| {
+                // Let's see if this won't blow past the requirement
+                var sum: [16]u16 = @splat(0);
+                b.jolt(st.jolts, &sum);
+                for (0..this.m.jolts.len - 1) |i| {
+                    if (sum[i] > this.m.jolts[i]) continue :oot;
+                }
+                const clone = try st.buttons.clone(this.al);
+                const clonep = try this.al.create(std.ArrayList(Button));
+                clonep.* = clone;
+                var newJolts = try this.al.dupe(u16, st.jolts);
+                for (this.m.jolts, 0..) |_, i| {
+                    newJolts[i] = sum[i];
+                }
+                var stc = State{ .buttons = clonep, .jolts = newJolts };
+                try stc.buttons.append(this.al, b);
+                const n = aoc.search.Node(State){ .cost = 1, .heuristic = 16 - @popCount(b.val), .val = stc };
+                try neighbors.append(this.al, n);
+
+                // std.debug.print("  Neighbor: {f} ({d}) - {any}\n", .{ stc, this.rf(stc), n });
+            }
+        }
+
+        pub fn nfin(this: *@This(), st: State) void {
+            this.al.free(st.jolts);
+            st.buttons.deinit(this.al);
+        }
+
+        pub fn rf(_: *@This(), st: State) u64 {
+            var h = std.hash.Wyhash.init(0);
+            for (st.jolts) |j| {
+                const v: [2]u8 = .{ @as(u8, @intCast(j >> 8)), @as(u8, @intCast(j & 0xff)) };
+                h.update(&v);
+            }
+
+            for (st.buttons.items) |b| {
+                const v: [2]u8 = .{ @as(u8, @intCast(b.val >> 8)), @as(u8, @intCast(b.val & 0xff)) };
+                h.update(&v);
+            }
+            return h.final();
+        }
+
+        pub fn found(this: *@This(), st: State) aoc.search.OutOfMemory!bool {
+            for (st.jolts, 0..) |j, i| {
+                if (j != this.m.jolts[i]) return false;
+            }
+            return true;
+        }
+    };
+
+    var empty = try std.ArrayList(Button).initCapacity(aalloc, 0);
+    var zeros = try aalloc.alloc(u16, m.jolts.len);
+    for (zeros, 0..) |_, i| zeros[i] = 0;
+    const emptyState = State{ .jolts = zeros, .buttons = &empty };
+
+    var t = T{ .m = m, .al = aalloc };
+    const ares = try aoc.search.astar(State, u64, aalloc, &t, emptyState, T.rf, T.neighbs, T.nfin, T.found);
+
+    // std.debug.print("Found path: {f}\n", .{m});
+
+    return @as(u16, @intCast(ares.cost));
+}
+
+fn part2(alloc: std.mem.Allocator, filename: []const u8) !u16 {
+    const ins = try parseInput(alloc, filename);
+    defer freeInput(alloc, ins);
+
+    const Item = struct {
+        machine: Machine,
+        result: u16 = 0,
+        al: std.mem.Allocator,
+
+        fn go(this: *@This()) void {
+            this.result = findSequence2(this.al, this.machine) catch 0;
+        }
+    };
+
+    var items = try alloc.alloc(*Item, ins.len);
+    for (ins, 0..) |m, i| {
+        var itemp = try alloc.create(Item);
+        itemp.machine = m.*;
+        itemp.al = alloc;
+        items[i] = itemp;
+    }
+    defer {
+        for (items) |i| {
+            alloc.destroy(i);
+        }
+        alloc.free(items);
+    }
+
+    try aoc.par.map(alloc, Item.go, items);
+
+    var rv: u16 = 0;
+    for (items) |i| rv += i.result;
+    return rv;
+}
+
+// test "part2ex" {
+//     const alloc = std.testing.allocator;
+//     try std.testing.expectEqual(33, try part2(alloc, "input/2025/day10.ex"));
+// }
+
+// test "part2" {
+//     const alloc = std.testing.allocator;
+//     try std.testing.expectEqual(0, try part2(alloc, "input/2025/day10"));
+// }
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        _ = gpa.deinit();
+    }
+    const alloc = gpa.allocator();
+
+    const ins = try parseInput(alloc, "input/2025/day10.ex");
+    defer freeInput(alloc, ins);
+    const x = try findSequence2(alloc, ins[0].*);
+
+    std.debug.print("ex: {d}\n", .{x});
 }

@@ -6,6 +6,7 @@ pub const permute = @import("permute.zig");
 pub const indy = @import("indy.zig");
 pub const set = @import("set.zig");
 pub const list = @import("list.zig");
+pub const par = @import("par.zig");
 
 const std = @import("std");
 
